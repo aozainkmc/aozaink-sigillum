@@ -1,0 +1,61 @@
+{
+  "display": {
+    "show_toast": true,
+    "description": {
+      "text": "释放过强、续、广、穿四种尾修。"
+    },
+    "announce_to_chat": true,
+    "frame": "goal",
+    "hidden": false,
+    "icon": {
+      "id": "aozaink_input:yellow_talisman",
+      "count": 1
+    },
+    "title": {
+      "text": "四象尾修"
+    },
+    "x": 5.4,
+    "y": -1.4
+  },
+  "criteria": {
+    "强": {
+      "trigger": "aozaink_sigillum:talisman_cast",
+      "conditions": {
+        "modifier": "强"
+      }
+    },
+    "续": {
+      "trigger": "aozaink_sigillum:talisman_cast",
+      "conditions": {
+        "modifier": "续"
+      }
+    },
+    "广": {
+      "trigger": "aozaink_sigillum:talisman_cast",
+      "conditions": {
+        "modifier": "广"
+      }
+    },
+    "穿": {
+      "trigger": "aozaink_sigillum:talisman_cast",
+      "conditions": {
+        "modifier": "穿"
+      }
+    }
+  },
+  "parent": "aozaink_sigillum:aozaink/single_skill_double_modifier",
+  "requirements": [
+    [
+      "强"
+    ],
+    [
+      "续"
+    ],
+    [
+      "广"
+    ],
+    [
+      "穿"
+    ]
+  ]
+}

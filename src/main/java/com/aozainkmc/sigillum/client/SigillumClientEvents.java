@@ -6,6 +6,7 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
+import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 
 @EventBusSubscriber(modid = SigillumMod.MOD_ID, value = Dist.CLIENT)
 public final class SigillumClientEvents {
@@ -21,5 +22,10 @@ public final class SigillumClientEvents {
                 SigillumClientHooks.openMenu();
             }
         }
+    }
+
+    @SubscribeEvent
+    public static void onRenderLevel(RenderLevelStageEvent event) {
+        SigillumInscriptionOverlay.render(event);
     }
 }

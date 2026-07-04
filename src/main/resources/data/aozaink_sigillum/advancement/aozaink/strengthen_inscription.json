@@ -1,0 +1,29 @@
+{
+  "display": {
+    "show_toast": true,
+    "description": {
+      "text": "第一次用强加强刻印。"
+    },
+    "announce_to_chat": true,
+    "frame": "task",
+    "hidden": false,
+    "icon": {
+      "id": "aozaink_input:yellow_talisman",
+      "count": 1
+    },
+    "title": {
+      "text": "加笔成势"
+    },
+    "x": 4.4,
+    "y": 3.3
+  },
+  "criteria": {
+    "done": {
+      "trigger": "aozaink_sigillum:inscription_changed",
+      "conditions": {
+        "type": "strengthened"
+      }
+    }
+  },
+  "parent": "aozaink_sigillum:aozaink/create_inscription"
+}

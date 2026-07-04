@@ -1,5 +1,7 @@
 package com.aozainkmc.sigillum.cast;
 
+import com.aozainkmc.sigillum.advancement.SigillumAdvancementTriggers;
+import com.aozainkmc.sigillum.advancement.SigillumCriterionTrigger;
 import com.aozainkmc.sigillum.network.ShieldSyncPayload;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -27,6 +29,29 @@ public final class SigillumShieldManager {
         sync(player, next);
     }
 
+    public static float grantWithOverflow(ServerPlayer player, float amount) {
+        if (amount <= 0.0f) return 0.0f;
+        ShieldState current = SHIELDS.get(player.getUUID());
+        float max = Math.max(amount, current == null ? amount : current.max);
+        float before = current == null ? 0.0f : current.amount;
+        float accepted = Math.min(amount, Math.max(0.0f, max - before));
+        if (accepted <= 0.0f) return amount;
+        ShieldState next = new ShieldState(before + accepted, max);
+        SHIELDS.put(player.getUUID(), next);
+        sync(player, next);
+        return Math.max(0.0f, amount - accepted);
+    }
+
+    public static void grantUncapped(ServerPlayer player, float amount) {
+        if (amount <= 0.0f) return;
+        ShieldState current = SHIELDS.get(player.getUUID());
+        float shield = current == null ? amount : current.amount + amount;
+        float max = Math.max(shield, current == null ? amount : current.max);
+        ShieldState next = new ShieldState(shield, max);
+        SHIELDS.put(player.getUUID(), next);
+        sync(player, next);
+    }
+
     public static float absorb(ServerPlayer player, float damage) {
         if (damage <= 0.0f) return damage;
         ShieldState state = SHIELDS.get(player.getUUID());
@@ -35,6 +60,9 @@ public final class SigillumShieldManager {
         float blocked = Math.min(state.amount, damage);
         float remaining = damage - blocked;
         state.amount -= blocked;
+        SigillumAdvancementTriggers.shieldEvent(player, SigillumCriterionTrigger.Event.empty()
+            .withType("absorbed")
+            .withCount(Math.max(1, Math.round(blocked))));
         player.serverLevel().sendParticles(ParticleTypes.ENCHANT,
             player.getX(), player.getY() + 1.0, player.getZ(),
             16, 0.35, 0.45, 0.35, 0.35);

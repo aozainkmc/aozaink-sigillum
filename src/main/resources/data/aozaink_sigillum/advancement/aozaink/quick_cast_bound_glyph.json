@@ -1,0 +1,27 @@
+{
+  "display": {
+    "show_toast": true,
+    "description": {
+      "text": "第一次用绑定数字快速吟唱。"
+    },
+    "announce_to_chat": true,
+    "frame": "task",
+    "hidden": false,
+    "icon": {
+      "id": "aozaink_input:yellow_talisman",
+      "count": 1
+    },
+    "title": {
+      "text": "一字即发"
+    },
+    "x": 2.0,
+    "y": -2.0
+  },
+  "criteria": {
+    "done": {
+      "trigger": "aozaink_sigillum:quick_cast",
+      "conditions": {}
+    }
+  },
+  "parent": "aozaink_sigillum:aozaink/bind_specified_talisman"
+}

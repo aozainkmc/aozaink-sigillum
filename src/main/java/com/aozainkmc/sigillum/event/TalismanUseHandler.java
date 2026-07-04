@@ -1,10 +1,17 @@
 package com.aozainkmc.sigillum.event;
 
+import com.aozainkmc.sigillum.advancement.SigillumAdvancementTriggers;
+import com.aozainkmc.sigillum.advancement.SigillumCriterionTrigger;
 import com.aozainkmc.sigillum.SigillumMod;
 import com.aozainkmc.sigillum.binding.GlyphBinding;
+import com.aozainkmc.sigillum.cast.SigillumInscriptionManager;
 import com.aozainkmc.sigillum.cast.SkillCast;
 import com.aozainkmc.sigillum.grade.TalismanGrade;
-import java.util.Optional;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.component.DataComponents;
@@ -17,11 +24,14 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.CustomData;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
-import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.phys.EntityHitResult;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -65,10 +75,16 @@ public final class TalismanUseHandler {
 
         CompoundTag tag = talismanTag(stack);
         if (!tag.contains(TAG_TYPE)) return;
+        if (shouldLetBlockHandle(player, event.getPos())) return;
 
         event.setCanceled(true);
         event.setCancellationResult(InteractionResult.SUCCESS);
         dispatchUse(player, tag, event.getPos());
+    }
+
+    private static boolean shouldLetBlockHandle(ServerPlayer player, BlockPos pos) {
+        if (player.isSecondaryUseActive()) return false;
+        return player.serverLevel().getBlockState(pos).getMenuProvider(player.serverLevel(), pos) != null;
     }
 
     private static void dispatchUse(ServerPlayer player, CompoundTag tag, BlockPos blockPos) {
@@ -79,7 +95,7 @@ public final class TalismanUseHandler {
 
         switch (type) {
             case "specified" -> useSpecified(player, slot1, slot2);
-            case "inscription" -> useInscription(player, slot1, slot2, blockPos);
+            case "inscription" -> useInscription(player, slot1, slot2, slot3, blockPos);
             case "combo" -> useCombo(player, tag, slot1, slot2, slot3);
             default -> useWaste(player);
         }
@@ -101,12 +117,59 @@ public final class TalismanUseHandler {
         }
 
         GlyphBinding.bind(player, number, glyph);
+        SigillumAdvancementTriggers.specifiedBound(player, glyph);
         notice(player, "已指定 " + number + " → " + glyph);
         spawnFlameBurst(player.serverLevel(), player.position());
         consumeOne(player);
     }
 
-    private static void useInscription(ServerPlayer player, String slot1, String glyph, BlockPos blockPos) {
+    private static void useInscription(ServerPlayer player, String slot1, String slot2, String slot3, BlockPos blockPos) {
+        if ("刻".equals(slot3) || (!"刻".equals(slot1) && !"刻".equals(slot2))) {
+            useWaste(player);
+            return;
+        }
+        if (slot3 != null && !slot3.isEmpty() && !SkillCast.isModifier(slot3)) {
+            useWaste(player);
+            return;
+        }
+
+        List<String> skills = new ArrayList<>();
+        List<String> modifiers = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+        int markCount = 0;
+        for (String slot : new String[] {slot1, slot2, slot3}) {
+            if (slot == null || slot.isEmpty()) continue;
+            if (!"刻".equals(slot) && !seen.add(slot)) {
+                useWaste(player);
+                return;
+            }
+            if ("刻".equals(slot)) {
+                markCount++;
+            } else if (SkillCast.isImplementedSkill(slot)) {
+                skills.add(slot);
+            } else if (SkillCast.isModifier(slot)) {
+                modifiers.add(slot);
+            } else {
+                useWaste(player);
+                return;
+            }
+        }
+        if (markCount != 1 || skills.size() > 1 || modifiers.size() > 2) {
+            useWaste(player);
+            return;
+        }
+        if (!skills.isEmpty() && modifiers.size() > 1) {
+            useWaste(player);
+            return;
+        }
+        if (skills.isEmpty() && modifiers.isEmpty()) {
+            useWaste(player);
+            return;
+        }
+        if (modifiers.contains("穿")) {
+            useWaste(player);
+            return;
+        }
         if (blockPos == null) {
             notice(player, "刻印符需对准方块使用");
             return;
@@ -117,68 +180,436 @@ public final class TalismanUseHandler {
             return;
         }
 
-        notice(player, "刻印 · " + glyph);
-        spawnRedstoneOnFaces(player.serverLevel(), blockPos);
-        spawnFlameBurst(player.serverLevel(), player.position());
-        consumeOne(player);
+        CompoundTag heldTag = talismanTag(player.getMainHandItem());
+        float overallM = overallMultiplier(heldTag, new String[] {slot1, slot2, slot3});
+        if (overallM <= 0.0f) {
+            useWaste(player);
+            return;
+        }
+        SigillumInscriptionManager.ActivationResult result =
+            SigillumInscriptionManager.activate(player, blockPos, skills, modifiers, overallM);
+        notice(player, result.message());
+        if (result.consume()) {
+            triggerInscription(player, skills, modifiers);
+            if (result.message().contains("1728000tick")) {
+                SigillumAdvancementTriggers.inscriptionChanged(player, SigillumCriterionTrigger.Event.empty()
+                    .withType("full_day"));
+            }
+            spawnRedstoneOnFaces(player.serverLevel(), blockPos);
+            spawnFlameBurst(player.serverLevel(), player.position());
+            consumeOne(player);
+        }
     }
 
     private static void useCombo(ServerPlayer player, CompoundTag tag, String slot1, String slot2, String slot3) {
         String[] slots = {slot1, slot2, slot3};
-        int skillIndex = -1;
-        int nonEmpty = 0;
-        for (int i = 0; i < 3; i++) {
-            if (slots[i] != null && !slots[i].isEmpty()) {
-                nonEmpty++;
-                if (SkillCast.isImplementedSkill(slots[i])) {
-                    skillIndex = i;
-                }
+        List<String> skills = new ArrayList<>();
+        List<String> modifiers = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+
+        for (String s : slots) {
+            if (s == null || s.isEmpty()) continue;
+            if (!seen.add(s)) {
+                useWaste(player);
+                return;
+            }
+            if (SkillCast.isImplementedSkill(s)) {
+                skills.add(s);
+            } else if (SkillCast.isModifier(s)) {
+                modifiers.add(s);
+            } else {
+                useWaste(player);
+                return;
             }
         }
 
-        if (nonEmpty == 1 && skillIndex >= 0) {
-            castSingle(player, tag, slots[skillIndex], skillIndex + 1);
+        if (skills.isEmpty()) {
+            useWaste(player);
             return;
         }
 
-        notice(player, "组合符 [" + slot1 + ", " + slot2 + ", " + slot3 + "]");
-        spawnFlameBurst(player.serverLevel(), player.position());
-        consumeOne(player);
-    }
-
-    private static void castSingle(ServerPlayer player, CompoundTag tag, String glyph, int slot) {
-        TalismanGrade grade = TalismanGrade.byName(tag.getString("aozaink:grade" + slot));
-        float multiplier;
-        String label;
-        if (grade != null) {
-            multiplier = grade.multiplier();
-            label = grade.display();
-            if (multiplier <= 0.0f) {
-                notice(player, glyph + " · " + label + "，术式溃散");
-                consumeOne(player);
-                return;
+        boolean hasTargetSkill = false;
+        for (String s : skills) {
+            if (SkillCast.hasTargetEffect(s)) {
+                hasTargetSkill = true;
+                break;
             }
-        } else {
-            multiplier = 1.0f;
-            label = "未评级";
+        }
+        boolean hasWideSupportSkill = skills.size() > 1 && skills.stream().anyMatch(SkillCast::hasWideSupportEffect);
+        if (!hasTargetSkill && modifiers.contains("穿")) {
+            useWaste(player);
+            return;
+        }
+        if (!hasTargetSkill && modifiers.contains("广") && !hasWideSupportSkill) {
+            useWaste(player);
+            return;
+        }
+        if (modifiers.contains("广") && modifiers.contains("穿")) {
+            useWaste(player);
+            return;
         }
 
-        SkillCast.Outcome outcome = SkillCast.cast(player, glyph, multiplier);
-        if (outcome == SkillCast.Outcome.MISS) {
-            notice(player, glyph + "符 · 未命中");
-            dropTalismanAt(player, SkillCast.landPoint(player));
+        float overallM = overallMultiplier(tag, slots);
+        String overallLabel = overallLabel(tag, slots);
+        if (overallM <= 0.0f) {
+            notice(player, "组合符 · " + overallLabel + "，术式溃散");
             consumeOne(player);
             return;
         }
 
-        notice(player, glyph + " · " + label + "  ×" + String.format("%.2f", multiplier));
+        if (skills.size() > 1) {
+            boolean strong = modifiers.contains("强");
+            boolean xu = modifiers.contains("续");
+            boolean guang = modifiers.contains("广");
+            boolean chuan = modifiers.contains("穿");
+
+            SkillCast.LinkedComboSpec spec = null;
+            if (skills.size() == 2 && modifiers.size() <= 1) {
+                spec = SkillCast.linkedComboSpec(skills.get(0), skills.get(1));
+            }
+
+            boolean needsTarget = spec != null ? spec.needsTarget() : hasRequiredTargetSkill(skills);
+            LivingEntity primary = null;
+            if (needsTarget && !chuan) {
+                primary = SkillCast.targetLiving(player);
+                if (primary == null) {
+                    notice(player, "组合符 · 未命中");
+                    dropStackAt(player, player.getMainHandItem().copyWithCount(1), SkillCast.landPoint(player));
+                    consumeOne(player);
+                    return;
+                }
+            }
+
+            float comboPower = overallM * (strong ? 2.0f : 1.0f);
+            float comboDuration = xu ? 1.0f + overallM : 1.0f;
+            SkillCast.CastEnv comboEnv = new SkillCast.CastEnv(comboPower, comboDuration);
+
+            if (spec != null) {
+                if (chuan) {
+                    if (!SkillCast.supportsPiercingCombo(spec)) {
+                        notice(player, spec.label() + " · 不支持穿透");
+                        consumeOne(player);
+                        return;
+                    }
+                    int maxHits = overallM >= 1.0f ? 3 : (overallM >= 0.8f ? 2 : 1);
+                    int hits = castPiercingLinkedCombo(player, spec, comboEnv, maxHits);
+                    if (hits == 0) {
+                        notice(player, spec.label() + " · 未命中");
+                        dropStackAt(player, player.getMainHandItem().copyWithCount(1), SkillCast.landPoint(player));
+                        consumeOne(player);
+                        return;
+                    }
+                    notice(player, spec.label() + " · " + overallLabel + " 穿透命中 " + hits + " 个");
+                    triggerSuccessfulCast(player, skills, modifiers, true, true, hits);
+                    consumeOne(player);
+                    return;
+                }
+                if (guang) {
+                    int hits = applyWideLinkedCombo(player, primary, spec, comboEnv);
+                    notice(player, spec.label() + " · " + overallLabel + " 广域命中 " + hits + " 个");
+                    triggerSuccessfulCast(player, skills, modifiers, true, spec.needsTarget(), hits);
+                    consumeOne(player);
+                    return;
+                }
+                SkillCast.applyLinkedCombo(player, primary, spec, comboEnv);
+                notice(player, spec.label() + " · " + overallLabel);
+                triggerSuccessfulCast(player, skills, modifiers, true, spec.needsTarget(), 1);
+                consumeOne(player);
+                return;
+            }
+
+            if (chuan) {
+                notice(player, "多字组合暂不支持穿透");
+                consumeOne(player);
+                return;
+            }
+
+            int applied = 0;
+            boolean affectedTarget = false;
+            for (String s : skills) {
+                if (overallM <= 0.0f) continue;
+                SkillCast.CastEnv sEnv = comboEnv;
+                boolean didApply = false;
+                if (guang && SkillCast.hasWideSupportEffect(s)) {
+                    applied += SkillCast.applyWideSupport(player, s, sEnv);
+                    didApply = true;
+                } else if (SkillCast.hasSelfEffect(s) && !(guang && "明".equals(s))) {
+                    SkillCast.applySelf(player, s, sEnv);
+                    didApply = true;
+                }
+                if (guang && "明".equals(s)) {
+                    SkillCast.applyWideLight(player, sEnv);
+                    didApply = true;
+                } else if (guang && SkillCast.hasTargetEffect(s) && primary != null) {
+                    SkillCast.CastEnv aoeEnv = sEnv.withMultiplier(0.7f);
+                    AABB box = new AABB(primary.blockPosition()).inflate(SkillCast.AOE_RADIUS);
+                    for (LivingEntity target : player.serverLevel().getEntitiesOfClass(LivingEntity.class, box,
+                            e -> e != player && e.isAlive())) {
+                        SkillCast.applyToTarget(player, target, s, aoeEnv);
+                        applied++;
+                    }
+                    didApply = true;
+                    affectedTarget = true;
+                } else if (primary != null && SkillCast.hasTargetEffect(s)) {
+                    SkillCast.applyToTarget(player, primary, s, sEnv);
+                    didApply = true;
+                    affectedTarget = true;
+                }
+                if (didApply) applied++;
+            }
+            if (applied > 0) {
+                notice(player, "组合 · " + String.join("/", skills) + " · " + overallLabel);
+                triggerSuccessfulCast(player, skills, modifiers, false, affectedTarget, applied);
+            } else {
+                notice(player, "组合符 · 术式溃散");
+            }
+            consumeOne(player);
+            return;
+        }
+
+        String skill = skills.get(0);
+        int skillSlot = skillSlot(skill, slots);
+
+        boolean strong = modifiers.contains("强");
+        boolean xu = modifiers.contains("续");
+        boolean guang = modifiers.contains("广");
+        boolean chuan = modifiers.contains("穿");
+
+        float powerM = overallM * (strong ? 2.0f : 1.0f);
+        float durationM = xu ? 1.0f + overallM : 1.0f;
+        SkillCast.CastEnv env = new SkillCast.CastEnv(powerM, durationM);
+
+        if (chuan && SkillCast.hasTargetEffect(skill)) {
+            int maxHits = overallM >= 1.0f ? 3 : (overallM >= 0.8f ? 2 : 1);
+            int hits = castPiercing(player, skill, env, maxHits);
+            if (hits == 0) {
+                notice(player, skill + "符 · 未命中");
+                dropStackAt(player, player.getMainHandItem().copyWithCount(1), SkillCast.landPoint(player));
+                consumeOne(player);
+                return;
+            }
+            if (SkillCast.hasSelfEffect(skill)) {
+                SkillCast.applySelf(player, skill, env);
+            }
+            ItemStack degraded = downgradedStack(player, tag, skillSlot, hits);
+            consumeOne(player);
+            if (!degraded.isEmpty()) {
+                giveOrDrop(player, degraded);
+            }
+            notice(player, skill + " · " + overallLabel + " 穿透命中 " + hits + " 个");
+            triggerSuccessfulCast(player, skills, modifiers, false, true, hits);
+            return;
+        }
+
+        if (guang && "明".equals(skill)) {
+            int hit = SkillCast.applyWideLight(player, env);
+            consumeOne(player);
+            notice(player, skill + " · " + overallLabel + " 广域照妖 " + hit + " 个");
+            triggerSuccessfulCast(player, skills, modifiers, false, true, hit);
+            return;
+        }
+
+        if (guang && SkillCast.hasTargetEffect(skill)) {
+            LivingEntity primary = SkillCast.targetLiving(player);
+            if (primary == null) {
+                notice(player, skill + "符 · 未命中");
+                dropStackAt(player, player.getMainHandItem().copyWithCount(1), SkillCast.landPoint(player));
+                consumeOne(player);
+                return;
+            }
+            SkillCast.CastEnv aoeEnv = env.withMultiplier(0.7f);
+            AABB box = new AABB(primary.blockPosition()).inflate(SkillCast.AOE_RADIUS);
+            int hit = 0;
+            for (LivingEntity target : player.serverLevel().getEntitiesOfClass(LivingEntity.class, box,
+                    e -> e != player && e.isAlive())) {
+                SkillCast.applyToTarget(player, target, skill, aoeEnv);
+                hit++;
+            }
+            consumeOne(player);
+            notice(player, skill + " · " + overallLabel + " 广域命中 " + hit + " 个");
+            triggerSuccessfulCast(player, skills, modifiers, false, true, hit);
+            return;
+        }
+
+        SkillCast.Outcome outcome = SkillCast.cast(player, skill, env);
+        if (outcome == SkillCast.Outcome.MISS) {
+            notice(player, skill + "符 · 未命中");
+            dropStackAt(player, player.getMainHandItem().copyWithCount(1), SkillCast.landPoint(player));
+            consumeOne(player);
+            return;
+        }
+
+        notice(player, skill + " · " + overallLabel + "  ×" + String.format("%.2f", powerM));
+        triggerSuccessfulCast(player, skills, modifiers, false, SkillCast.hasTargetEffect(skill), 1);
         consumeOne(player);
     }
 
-    private static void dropTalismanAt(ServerPlayer player, net.minecraft.world.phys.Vec3 point) {
+    private static void triggerInscription(ServerPlayer player, List<String> skills, List<String> modifiers) {
+        if (!skills.isEmpty()) {
+            for (String skill : skills) {
+                SigillumAdvancementTriggers.inscriptionChanged(player, SigillumCriterionTrigger.Event.empty()
+                    .withType("created")
+                    .withSkill(skill));
+            }
+        }
+        for (String modifier : modifiers) {
+            String type = switch (modifier) {
+                case "续" -> "extended";
+                case "强" -> "strengthened";
+                case "广" -> "widened";
+                default -> "modified";
+            };
+            SigillumAdvancementTriggers.inscriptionChanged(player, SigillumCriterionTrigger.Event.empty()
+                .withType(type)
+                .withModifier(modifier));
+        }
+    }
+
+    private static void triggerSuccessfulCast(ServerPlayer player, List<String> skills, List<String> modifiers,
+            boolean linked, boolean target, int count) {
+        SigillumCriterionTrigger.Event base = SigillumCriterionTrigger.Event.empty()
+            .withType(target ? "target" : "self")
+            .withLinked(linked)
+            .withCount(count);
+        SigillumAdvancementTriggers.talismanCast(player, base);
+        if (skills.size() == 1 && modifiers.size() == 2) {
+            SigillumAdvancementTriggers.talismanCast(player, base.withSpecial("single_skill_double_modifier"));
+        }
+        for (String skill : skills) {
+            SigillumAdvancementTriggers.talismanCast(player, base.withSkill(skill));
+        }
+        for (String modifier : modifiers) {
+            SigillumAdvancementTriggers.talismanCast(player, base.withModifier(modifier));
+        }
+        if (linked && skills.contains("火") && skills.contains("雷")) {
+            SigillumAdvancementTriggers.specialEffect(player, SigillumCriterionTrigger.Event.empty()
+                .withSpecial("fire_thunder_chain"));
+        }
+    }
+
+    private static boolean hasRequiredTargetSkill(List<String> skills) {
+        for (String skill : skills) {
+            if (SkillCast.requiresTarget(skill)) return true;
+        }
+        return false;
+    }
+
+    private static int skillSlot(String skill, String[] slots) {
+        for (int i = 0; i < slots.length; i++) {
+            if (skill.equals(slots[i])) return i + 1;
+        }
+        return 1;
+    }
+
+    private static float overallMultiplier(CompoundTag tag, String[] slots) {
+        TalismanGrade worst = null;
+        for (int i = 0; i < slots.length; i++) {
+            if (slots[i] == null || slots[i].isEmpty()) continue;
+            TalismanGrade g = TalismanGrade.byName(tag.getString("aozaink:grade" + (i + 1)));
+            if (g == null) continue;
+            if (worst == null || g.ordinal() > worst.ordinal()) worst = g;
+        }
+        return worst == null ? 1.0f : worst.multiplier();
+    }
+
+    private static String overallLabel(CompoundTag tag, String[] slots) {
+        TalismanGrade worst = null;
+        for (int i = 0; i < slots.length; i++) {
+            if (slots[i] == null || slots[i].isEmpty()) continue;
+            TalismanGrade g = TalismanGrade.byName(tag.getString("aozaink:grade" + (i + 1)));
+            if (g == null) continue;
+            if (worst == null || g.ordinal() > worst.ordinal()) worst = g;
+        }
+        return worst == null ? "未评级" : worst.display();
+    }
+
+    private static int castPiercing(ServerPlayer player, String skill, SkillCast.CastEnv env, int maxHits) {
+        Set<UUID> hit = new HashSet<>();
+        int hits = 0;
+        for (int i = 0; i < maxHits; i++) {
+            EntityHitResult result = nextPierceTarget(player, hit);
+            if (result == null || !(result.getEntity() instanceof LivingEntity target)) break;
+            SkillCast.applyToTarget(player, target, skill, env);
+            hit.add(target.getUUID());
+            hits++;
+        }
+        return hits;
+    }
+
+    private static int castPiercingLinkedCombo(ServerPlayer player, SkillCast.LinkedComboSpec spec,
+                                               SkillCast.CastEnv env, int maxHits) {
+        Set<UUID> hit = new HashSet<>();
+        int hits = 0;
+        for (int i = 0; i < maxHits; i++) {
+            EntityHitResult result = nextPierceTarget(player, hit);
+            if (result == null || !(result.getEntity() instanceof LivingEntity target)) break;
+            SkillCast.applyLinkedCombo(player, target, spec, env);
+            hit.add(target.getUUID());
+            hits++;
+        }
+        return hits;
+    }
+
+    private static int applyWideLinkedCombo(ServerPlayer player, LivingEntity primary,
+                                            SkillCast.LinkedComboSpec spec, SkillCast.CastEnv env) {
+        SkillCast.CastEnv supportEnv = env.withWideSupport();
+        if (!spec.needsTarget()) {
+            SkillCast.applyLinkedCombo(player, null, spec, supportEnv);
+            return 0;
+        }
+        if (primary == null) return 0;
+
+        int hits = 0;
+        Set<UUID> applied = new HashSet<>();
+        SkillCast.applyLinkedCombo(player, primary, spec, supportEnv);
+        applied.add(primary.getUUID());
+        hits++;
+
+        SkillCast.CastEnv areaEnv = env.withMultiplier(0.7f).withoutSelfSupport();
+        AABB box = new AABB(primary.blockPosition()).inflate(SkillCast.AOE_RADIUS);
+        for (LivingEntity target : player.serverLevel().getEntitiesOfClass(LivingEntity.class, box,
+                e -> e != player && e.isAlive())) {
+            if (!applied.add(target.getUUID())) continue;
+            SkillCast.applyLinkedCombo(player, target, spec, areaEnv);
+            hits++;
+        }
+        return hits;
+    }
+
+    private static EntityHitResult nextPierceTarget(ServerPlayer player, Set<UUID> excluded) {
+        Vec3 start = player.getEyePosition(1.0f);
+        Vec3 end = start.add(player.getViewVector(1.0f).scale(SkillCast.RANGE));
+        AABB box = player.getBoundingBox().expandTowards(end).inflate(1.0);
+        return net.minecraft.world.entity.projectile.ProjectileUtil.getEntityHitResult(
+            player.serverLevel(), player, start, end, box,
+            e -> e instanceof LivingEntity && e != player && e.isAlive() && !excluded.contains(e.getUUID()));
+    }
+
+    private static ItemStack downgradedStack(ServerPlayer player, CompoundTag tag, int skillSlot, int hits) {
         ItemStack held = player.getMainHandItem();
-        if (held.isEmpty()) return;
-        ItemEntity entity = new ItemEntity(player.serverLevel(), point.x, point.y, point.z, held.copyWithCount(1));
+        if (held.isEmpty()) return ItemStack.EMPTY;
+        TalismanGrade grade = TalismanGrade.byName(tag.getString("aozaink:grade" + skillSlot));
+        for (int i = 0; i < hits && grade != null && grade != TalismanGrade.WASTE; i++) {
+            grade = grade.nextLower();
+        }
+        if (grade == null || grade == TalismanGrade.WASTE) return ItemStack.EMPTY;
+        CompoundTag newTag = tag.copy();
+        newTag.putString("aozaink:grade" + skillSlot, grade.name());
+        ItemStack stack = held.copyWithCount(1);
+        stack.set(DataComponents.CUSTOM_DATA, CustomData.of(newTag));
+        return stack;
+    }
+
+    private static void giveOrDrop(ServerPlayer player, ItemStack stack) {
+        if (stack.isEmpty()) return;
+        if (!player.getInventory().add(stack)) {
+            dropStackAt(player, stack, player.position());
+        }
+    }
+
+    private static void dropStackAt(ServerPlayer player, ItemStack stack, Vec3 point) {
+        if (stack.isEmpty()) return;
+        ItemEntity entity = new ItemEntity(player.serverLevel(), point.x, point.y, point.z, stack);
         entity.setDefaultPickUpDelay();
         player.serverLevel().addFreshEntity(entity);
     }
@@ -233,7 +664,7 @@ public final class TalismanUseHandler {
     }
 
     private static CompoundTag talismanTag(ItemStack stack) {
-        net.minecraft.world.item.component.CustomData data = stack.get(DataComponents.CUSTOM_DATA);
+        CustomData data = stack.get(DataComponents.CUSTOM_DATA);
         return data == null ? new CompoundTag() : data.copyTag();
     }
 }

@@ -32,6 +32,7 @@ public final class SigillumEffectTicker {
             TASKS.removeIf(Task::tick);
         }
         SigillumShieldManager.tick(event.getServer());
+        SigillumInscriptionManager.tick(event.getServer());
     }
 
     public static void scheduleBurn(ServerLevel level, LivingEntity target, float dmgPerSecond, int seconds) {

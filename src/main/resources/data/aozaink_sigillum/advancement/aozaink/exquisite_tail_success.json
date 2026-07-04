@@ -1,0 +1,45 @@
+{
+  "display": {
+    "title": {
+      "text": "稳中求险"
+    },
+    "hidden": false,
+    "frame": "goal",
+    "description": {
+      "text": "第一次成功写出极品尾修黄符。"
+    },
+    "show_toast": true,
+    "icon": {
+      "count": 1,
+      "id": "aozaink_input:yellow_talisman"
+    },
+    "announce_to_chat": true,
+    "x": 4.4,
+    "y": -2.2
+  },
+  "criteria": {
+    "combo": {
+      "conditions": {
+        "grade": "exquisite",
+        "type": "combo",
+        "tail": true
+      },
+      "trigger": "aozaink_sigillum:talisman_created"
+    },
+    "inscription": {
+      "conditions": {
+        "grade": "exquisite",
+        "type": "inscription",
+        "tail": true
+      },
+      "trigger": "aozaink_sigillum:talisman_created"
+    }
+  },
+  "requirements": [
+    [
+      "combo",
+      "inscription"
+    ]
+  ],
+  "parent": "aozaink_sigillum:aozaink/tail_modifier_success"
+}

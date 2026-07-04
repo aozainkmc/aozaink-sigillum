@@ -1,0 +1,30 @@
+{
+  "display": {
+    "show_toast": true,
+    "description": {
+      "text": "斩明标记至少五个目标却无人可斩。"
+    },
+    "announce_to_chat": true,
+    "frame": "challenge",
+    "hidden": true,
+    "icon": {
+      "id": "aozaink_input:yellow_talisman",
+      "count": 1
+    },
+    "title": {
+      "text": "一个都斩不了"
+    },
+    "x": 2.0,
+    "y": 2.6
+  },
+  "criteria": {
+    "done": {
+      "trigger": "aozaink_sigillum:special_effect",
+      "conditions": {
+        "min_count": 5,
+        "special": "slash_mark_miss_all"
+      }
+    }
+  },
+  "parent": "aozaink_sigillum:aozaink/cast_linked_combo"
+}

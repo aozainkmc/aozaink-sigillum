@@ -1,0 +1,29 @@
+{
+  "display": {
+    "show_toast": true,
+    "description": {
+      "text": "用雷触发一次原版雷击转化。"
+    },
+    "announce_to_chat": true,
+    "frame": "challenge",
+    "hidden": true,
+    "icon": {
+      "id": "aozaink_input:yellow_talisman",
+      "count": 1
+    },
+    "title": {
+      "text": "天雷有应"
+    },
+    "x": 2.0,
+    "y": -0.4
+  },
+  "criteria": {
+    "done": {
+      "trigger": "aozaink_sigillum:special_effect",
+      "conditions": {
+        "special": "lightning_transmutation"
+      }
+    }
+  },
+  "parent": "aozaink_sigillum:aozaink/cast_on_target"
+}

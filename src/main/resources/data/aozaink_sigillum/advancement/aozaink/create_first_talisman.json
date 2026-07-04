@@ -1,0 +1,48 @@
+{
+  "display": {
+    "title": {
+      "text": "成符"
+    },
+    "hidden": false,
+    "frame": "task",
+    "description": {
+      "text": "第一次把黄符写成可携带的符。"
+    },
+    "show_toast": true,
+    "icon": {
+      "count": 1,
+      "id": "aozaink_input:yellow_talisman"
+    },
+    "announce_to_chat": true,
+    "x": 2.0,
+    "y": -3.2
+  },
+  "criteria": {
+    "combo": {
+      "conditions": {
+        "type": "combo"
+      },
+      "trigger": "aozaink_sigillum:talisman_created"
+    },
+    "specified": {
+      "conditions": {
+        "type": "specified"
+      },
+      "trigger": "aozaink_sigillum:talisman_created"
+    },
+    "inscription": {
+      "conditions": {
+        "type": "inscription"
+      },
+      "trigger": "aozaink_sigillum:talisman_created"
+    }
+  },
+  "requirements": [
+    [
+      "combo",
+      "specified",
+      "inscription"
+    ]
+  ],
+  "parent": "aozaink_sigillum:aozaink/craft_blank_yellow_talisman"
+}

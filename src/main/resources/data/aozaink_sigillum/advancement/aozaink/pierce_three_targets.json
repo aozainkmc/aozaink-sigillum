@@ -1,0 +1,30 @@
+{
+  "display": {
+    "show_toast": true,
+    "description": {
+      "text": "一次穿透命中三个目标。"
+    },
+    "announce_to_chat": true,
+    "frame": "challenge",
+    "hidden": true,
+    "icon": {
+      "id": "aozaink_input:yellow_talisman",
+      "count": 1
+    },
+    "title": {
+      "text": "一笔三断"
+    },
+    "x": 4.4,
+    "y": 2.3
+  },
+  "criteria": {
+    "done": {
+      "trigger": "aozaink_sigillum:talisman_cast",
+      "conditions": {
+        "modifier": "穿",
+        "min_count": 3
+      }
+    }
+  },
+  "parent": "aozaink_sigillum:aozaink/cast_piercing"
+}

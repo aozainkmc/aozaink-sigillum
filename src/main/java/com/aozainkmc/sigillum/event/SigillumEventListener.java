@@ -1,5 +1,6 @@
 package com.aozainkmc.sigillum.event;
 
+import com.aozainkmc.sigillum.advancement.SigillumAdvancementTriggers;
 import com.aozainkmc.sigillum.SigillumMod;
 import com.aozainkmc.sigillum.binding.GlyphBinding;
 import com.aozainkmc.sigillum.glyph.GlyphSemantics;
@@ -89,6 +90,9 @@ public final class SigillumEventListener {
         }
 
         String glyph = bound.get();
+        if (event.player() instanceof net.minecraft.server.level.ServerPlayer serverPlayer) {
+            SigillumAdvancementTriggers.quickCast(serverPlayer, glyph);
+        }
         event.player().displayClientMessage(
             Component.literal("[Sigillum] 快速吟唱: " + word + " -> " + glyph
                 + " | 倍率: " + source.powerMultiplier()), false);

@@ -1,0 +1,26 @@
+{
+  "display": {
+    "title": {
+      "text": "黄符"
+    },
+    "description": {
+      "text": "手写成符，驱邪护身。"
+    },
+    "icon": {
+      "id": "aozaink_input:yellow_talisman",
+      "count": 1
+    },
+    "background": "aozaink_sigillum:textures/gui/advancements/aozaink.png",
+    "frame": "task",
+    "show_toast": false,
+    "announce_to_chat": false,
+    "hidden": false,
+    "x": 0.0,
+    "y": 0.0
+  },
+  "criteria": {
+    "visible": {
+      "trigger": "minecraft:tick"
+    }
+  }
+}

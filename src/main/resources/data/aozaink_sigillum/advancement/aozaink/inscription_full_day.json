@@ -1,0 +1,29 @@
+{
+  "display": {
+    "show_toast": true,
+    "description": {
+      "text": "把同一个刻印推到二十四小时上限。"
+    },
+    "announce_to_chat": true,
+    "frame": "challenge",
+    "hidden": true,
+    "icon": {
+      "id": "aozaink_input:yellow_talisman",
+      "count": 1
+    },
+    "title": {
+      "text": "一日不灭"
+    },
+    "x": 5.4,
+    "y": 2.7
+  },
+  "criteria": {
+    "done": {
+      "trigger": "aozaink_sigillum:inscription_changed",
+      "conditions": {
+        "type": "full_day"
+      }
+    }
+  },
+  "parent": "aozaink_sigillum:aozaink/extend_inscription"
+}

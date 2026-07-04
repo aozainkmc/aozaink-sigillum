@@ -1,7 +1,9 @@
 package com.aozainkmc.sigillum.event;
 
 import com.aozainkmc.sigillum.SigillumMod;
+import com.aozainkmc.sigillum.cast.SigillumComboState;
 import com.aozainkmc.sigillum.cast.SigillumShieldManager;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -16,7 +18,10 @@ public final class SigillumShieldEvents {
     @SubscribeEvent
     public static void onLivingDamage(LivingDamageEvent.Pre event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
-        float remaining = SigillumShieldManager.absorb(player, event.getNewDamage());
+        Entity attacker = event.getSource().getEntity();
+        float incoming = SigillumComboState.beforeShieldDamage(player, attacker, event.getNewDamage());
+        float remaining = SigillumShieldManager.absorb(player, incoming);
+        SigillumComboState.afterShieldBlocked(player, attacker, Math.max(0.0f, incoming - remaining));
         event.setNewDamage(remaining);
     }
 

@@ -1,0 +1,27 @@
+{
+  "display": {
+    "show_toast": true,
+    "description": {
+      "text": "第一次用指定符绑定一个快写字。"
+    },
+    "announce_to_chat": true,
+    "frame": "task",
+    "hidden": false,
+    "icon": {
+      "id": "aozaink_input:yellow_talisman",
+      "count": 1
+    },
+    "title": {
+      "text": "口令"
+    },
+    "x": 1.0,
+    "y": -2.0
+  },
+  "criteria": {
+    "done": {
+      "trigger": "aozaink_sigillum:specified_bound",
+      "conditions": {}
+    }
+  },
+  "parent": "aozaink_sigillum:aozaink/root"
+}

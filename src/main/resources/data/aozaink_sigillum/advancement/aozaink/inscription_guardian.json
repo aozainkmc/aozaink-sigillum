@@ -1,0 +1,30 @@
+{
+  "display": {
+    "show_toast": true,
+    "description": {
+      "text": "第一次刻下护印。"
+    },
+    "announce_to_chat": true,
+    "frame": "goal",
+    "hidden": false,
+    "icon": {
+      "id": "aozaink_input:yellow_talisman",
+      "count": 1
+    },
+    "title": {
+      "text": "圈地为护"
+    },
+    "x": 4.4,
+    "y": 4.5
+  },
+  "criteria": {
+    "done": {
+      "trigger": "aozaink_sigillum:inscription_changed",
+      "conditions": {
+        "skill": "护",
+        "type": "created"
+      }
+    }
+  },
+  "parent": "aozaink_sigillum:aozaink/create_inscription"
+}

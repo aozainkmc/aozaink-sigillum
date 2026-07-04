@@ -1,0 +1,30 @@
+{
+  "display": {
+    "show_toast": true,
+    "description": {
+      "text": "第一次穿透命中至少两个目标。"
+    },
+    "announce_to_chat": true,
+    "frame": "goal",
+    "hidden": false,
+    "icon": {
+      "id": "aozaink_input:yellow_talisman",
+      "count": 1
+    },
+    "title": {
+      "text": "一线贯通"
+    },
+    "x": 3.4,
+    "y": 2.3
+  },
+  "criteria": {
+    "done": {
+      "trigger": "aozaink_sigillum:talisman_cast",
+      "conditions": {
+        "modifier": "穿",
+        "min_count": 2
+      }
+    }
+  },
+  "parent": "aozaink_sigillum:aozaink/root"
+}

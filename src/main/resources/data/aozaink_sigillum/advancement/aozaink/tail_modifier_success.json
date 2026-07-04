@@ -1,0 +1,43 @@
+{
+  "display": {
+    "title": {
+      "text": "朱砂尾修"
+    },
+    "hidden": false,
+    "frame": "task",
+    "description": {
+      "text": "第一次成功写出带尾修的黄符。"
+    },
+    "show_toast": true,
+    "icon": {
+      "count": 1,
+      "id": "aozaink_input:yellow_talisman"
+    },
+    "announce_to_chat": true,
+    "x": 3.4,
+    "y": -1.8
+  },
+  "criteria": {
+    "combo": {
+      "conditions": {
+        "type": "combo",
+        "tail": true
+      },
+      "trigger": "aozaink_sigillum:talisman_created"
+    },
+    "inscription": {
+      "conditions": {
+        "type": "inscription",
+        "tail": true
+      },
+      "trigger": "aozaink_sigillum:talisman_created"
+    }
+  },
+  "requirements": [
+    [
+      "combo",
+      "inscription"
+    ]
+  ],
+  "parent": "aozaink_sigillum:aozaink/root"
+}

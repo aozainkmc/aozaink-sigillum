@@ -1,0 +1,29 @@
+{
+  "display": {
+    "title": {
+      "text": "也算一种结果"
+    },
+    "hidden": false,
+    "frame": "task",
+    "description": {
+      "text": "第一次写成废符。"
+    },
+    "show_toast": true,
+    "icon": {
+      "count": 1,
+      "id": "aozaink_input:yellow_talisman"
+    },
+    "announce_to_chat": true,
+    "x": 2.0,
+    "y": -4.0
+  },
+  "criteria": {
+    "done": {
+      "conditions": {
+        "type": "failed"
+      },
+      "trigger": "aozaink_sigillum:talisman_created"
+    }
+  },
+  "parent": "aozaink_sigillum:aozaink/craft_blank_yellow_talisman"
+}

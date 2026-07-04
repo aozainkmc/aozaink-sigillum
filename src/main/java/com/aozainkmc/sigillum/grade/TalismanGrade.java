@@ -39,4 +39,13 @@ public enum TalismanGrade {
             return null;
         }
     }
+
+    public TalismanGrade nextLower() {
+        return switch (this) {
+            case EXQUISITE -> FINE;
+            case FINE -> INFERIOR;
+            case INFERIOR -> WASTE;
+            case WASTE -> WASTE;
+        };
+    }
 }

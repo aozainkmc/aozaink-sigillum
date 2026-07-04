@@ -1,0 +1,29 @@
+{
+  "display": {
+    "show_toast": true,
+    "description": {
+      "text": "第一次合成空白黄符。"
+    },
+    "announce_to_chat": true,
+    "frame": "task",
+    "hidden": false,
+    "icon": {
+      "id": "aozaink_input:yellow_talisman",
+      "count": 1
+    },
+    "title": {
+      "text": "我该放哪里？"
+    },
+    "x": 1.0,
+    "y": -3.2
+  },
+  "criteria": {
+    "done": {
+      "trigger": "minecraft:recipe_crafted",
+      "conditions": {
+        "recipe_id": "aozaink_input:yellow_talisman"
+      }
+    }
+  },
+  "parent": "aozaink_sigillum:aozaink/root"
+}

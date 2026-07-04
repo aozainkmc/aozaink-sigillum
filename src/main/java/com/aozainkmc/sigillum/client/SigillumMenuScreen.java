@@ -97,7 +97,7 @@ public final class SigillumMenuScreen extends Screen {
 
             if (bound) {
                 drawGlyphTag(g, glyph, glyphX + 4, rowY, rowH);
-                g.drawString(this.font, GlyphCodex.describe(glyph), effectX, textY, PAPER_TX, false);
+                g.drawString(this.font, GlyphCodex.describe(glyph, SigillumClientConfig.detailed()), effectX, textY, PAPER_TX, false);
                 int[] cb = clearRect(rowY, rowH);
                 g.fill(cb[0], cb[1], cb[0] + cb[2], cb[1] + cb[3], 0x66302118);
                 drawBorder(g, cb[0], cb[1], cb[2], cb[3], MUTED_DK);
@@ -138,7 +138,7 @@ public final class SigillumMenuScreen extends Screen {
             int rowY = listY + row * rowH;
             String glyph = glyphs.get(idx);
             drawScaledText(g, glyph, rowX, rowY + 2, RED_TX, 1.25f);
-            g.drawString(this.font, GlyphCodex.describe(glyph), rowX + 32, rowY + 6, PAPER_TX, false);
+            g.drawString(this.font, GlyphCodex.describe(glyph, SigillumClientConfig.detailed()), rowX + 32, rowY + 6, PAPER_TX, false);
             }
         }
         drawScrollBar(g, x, listY, w, visibleRows * rowH, totalRows, visibleRows, codexScroll);
@@ -187,6 +187,7 @@ public final class SigillumMenuScreen extends Screen {
 
     private void drawBottomButtons(GuiGraphics g, int mx, int my) {
         drawButton(g, clearAllRect(), "全部清空", PAPER_DK, mx, my);
+        drawButton(g, toggleDetailRect(), SigillumClientConfig.detailed() ? "详细信息" : "简略信息", PAPER_DK, mx, my);
         drawButton(g, backRect(), "返回", PAPER_DK, mx, my);
     }
 
@@ -299,6 +300,10 @@ public final class SigillumMenuScreen extends Screen {
                     }
                 }
                 bindings.clear();
+                return true;
+            }
+            if (hit(mx, my, toggleDetailRect())) {
+                SigillumClientConfig.toggleDetailed();
                 return true;
             }
             if (activeTab == 0) {
@@ -435,6 +440,12 @@ public final class SigillumMenuScreen extends Screen {
 
     private int[] clearAllRect() {
         return new int[] {contentX(), bottomY(), buttonW() + 18, buttonH()};
+    }
+
+    private int[] toggleDetailRect() {
+        int tw = Math.max(70, buttonW() + 4);
+        int centerX = contentX() + contentW() / 2;
+        return new int[] {centerX - tw / 2, bottomY(), tw, buttonH()};
     }
 
     private int[] backRect() {

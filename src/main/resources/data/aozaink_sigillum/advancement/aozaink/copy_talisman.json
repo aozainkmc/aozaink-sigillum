@@ -1,0 +1,29 @@
+{
+  "display": {
+    "show_toast": true,
+    "description": {
+      "text": "第一次拓印一张写好的黄符。"
+    },
+    "announce_to_chat": true,
+    "frame": "task",
+    "hidden": false,
+    "icon": {
+      "id": "aozaink_input:yellow_talisman",
+      "count": 1
+    },
+    "title": {
+      "text": "拓印"
+    },
+    "x": 3.0,
+    "y": -2.8
+  },
+  "criteria": {
+    "done": {
+      "trigger": "minecraft:recipe_crafted",
+      "conditions": {
+        "recipe_id": "aozaink_input:talisman_copy"
+      }
+    }
+  },
+  "parent": "aozaink_sigillum:aozaink/create_first_talisman"
+}

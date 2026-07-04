@@ -1,0 +1,29 @@
+{
+  "display": {
+    "show_toast": true,
+    "description": {
+      "text": "第一次见到刻印自然耗尽。"
+    },
+    "announce_to_chat": true,
+    "frame": "task",
+    "hidden": false,
+    "icon": {
+      "id": "aozaink_input:yellow_talisman",
+      "count": 1
+    },
+    "title": {
+      "text": "墨尽法散"
+    },
+    "x": 4.4,
+    "y": 5.1
+  },
+  "criteria": {
+    "done": {
+      "trigger": "aozaink_sigillum:inscription_changed",
+      "conditions": {
+        "type": "depleted"
+      }
+    }
+  },
+  "parent": "aozaink_sigillum:aozaink/create_inscription"
+}

@@ -1,0 +1,29 @@
+{
+  "display": {
+    "show_toast": true,
+    "description": {
+      "text": "第一次让黄符成功影响目标。"
+    },
+    "announce_to_chat": true,
+    "frame": "task",
+    "hidden": false,
+    "icon": {
+      "id": "aozaink_input:yellow_talisman",
+      "count": 1
+    },
+    "title": {
+      "text": "术有所指"
+    },
+    "x": 1.0,
+    "y": -0.8
+  },
+  "criteria": {
+    "done": {
+      "trigger": "aozaink_sigillum:talisman_cast",
+      "conditions": {
+        "type": "target"
+      }
+    }
+  },
+  "parent": "aozaink_sigillum:aozaink/root"
+}

@@ -1,0 +1,133 @@
+{
+  "display": {
+    "show_toast": true,
+    "description": {
+      "text": "释放过十二个技能字。"
+    },
+    "announce_to_chat": true,
+    "frame": "goal",
+    "hidden": false,
+    "icon": {
+      "id": "aozaink_input:yellow_talisman",
+      "count": 1
+    },
+    "title": {
+      "text": "十二字俱全"
+    },
+    "x": 2.0,
+    "y": -1.2
+  },
+  "criteria": {
+    "镇": {
+      "trigger": "aozaink_sigillum:talisman_cast",
+      "conditions": {
+        "skill": "镇"
+      }
+    },
+    "封": {
+      "trigger": "aozaink_sigillum:talisman_cast",
+      "conditions": {
+        "skill": "封"
+      }
+    },
+    "退": {
+      "trigger": "aozaink_sigillum:talisman_cast",
+      "conditions": {
+        "skill": "退"
+      }
+    },
+    "引": {
+      "trigger": "aozaink_sigillum:talisman_cast",
+      "conditions": {
+        "skill": "引"
+      }
+    },
+    "火": {
+      "trigger": "aozaink_sigillum:talisman_cast",
+      "conditions": {
+        "skill": "火"
+      }
+    },
+    "雷": {
+      "trigger": "aozaink_sigillum:talisman_cast",
+      "conditions": {
+        "skill": "雷"
+      }
+    },
+    "护": {
+      "trigger": "aozaink_sigillum:talisman_cast",
+      "conditions": {
+        "skill": "护"
+      }
+    },
+    "净": {
+      "trigger": "aozaink_sigillum:talisman_cast",
+      "conditions": {
+        "skill": "净"
+      }
+    },
+    "斩": {
+      "trigger": "aozaink_sigillum:talisman_cast",
+      "conditions": {
+        "skill": "斩"
+      }
+    },
+    "明": {
+      "trigger": "aozaink_sigillum:talisman_cast",
+      "conditions": {
+        "skill": "明"
+      }
+    },
+    "吸": {
+      "trigger": "aozaink_sigillum:talisman_cast",
+      "conditions": {
+        "skill": "吸"
+      }
+    },
+    "魄": {
+      "trigger": "aozaink_sigillum:talisman_cast",
+      "conditions": {
+        "skill": "魄"
+      }
+    }
+  },
+  "parent": "aozaink_sigillum:aozaink/cast_on_target",
+  "requirements": [
+    [
+      "镇"
+    ],
+    [
+      "封"
+    ],
+    [
+      "退"
+    ],
+    [
+      "引"
+    ],
+    [
+      "火"
+    ],
+    [
+      "雷"
+    ],
+    [
+      "护"
+    ],
+    [
+      "净"
+    ],
+    [
+      "斩"
+    ],
+    [
+      "明"
+    ],
+    [
+      "吸"
+    ],
+    [
+      "魄"
+    ]
+  ]
+}

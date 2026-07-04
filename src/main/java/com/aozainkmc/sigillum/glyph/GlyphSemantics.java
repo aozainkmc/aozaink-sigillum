@@ -14,8 +14,14 @@ public final class GlyphSemantics {
         WORD_TAGS.put("封", List.of("sigillum.seal", "sigillum.ward"));
         WORD_TAGS.put("退", List.of("sigillum.repel", "sigillum.cleanse"));
         WORD_TAGS.put("引", List.of("sigillum.lure", "sigillum.pull"));
+        WORD_TAGS.put("火", List.of("sigillum.fire", "sigillum.element"));
+        WORD_TAGS.put("雷", List.of("sigillum.thunder", "sigillum.element"));
+        WORD_TAGS.put("护", List.of("sigillum.shield", "sigillum.protect"));
         WORD_TAGS.put("净", List.of("sigillum.purify", "sigillum.heal"));
+        WORD_TAGS.put("斩", List.of("sigillum.execute", "sigillum.attack"));
         WORD_TAGS.put("明", List.of("sigillum.reveal", "sigillum.light"));
+        WORD_TAGS.put("吸", List.of("sigillum.drain", "sigillum.heal"));
+        WORD_TAGS.put("魄", List.of("sigillum.soul", "sigillum.recall"));
     }
 
     private GlyphSemantics() {}

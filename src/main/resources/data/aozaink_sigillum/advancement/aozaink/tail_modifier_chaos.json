@@ -1,0 +1,27 @@
+{
+  "display": {
+    "show_toast": true,
+    "description": {
+      "text": "第一次尾修稳定性失败。"
+    },
+    "announce_to_chat": true,
+    "frame": "task",
+    "hidden": false,
+    "icon": {
+      "id": "aozaink_input:yellow_talisman",
+      "count": 1
+    },
+    "title": {
+      "text": "符力暴乱"
+    },
+    "x": 3.4,
+    "y": -0.5
+  },
+  "criteria": {
+    "done": {
+      "trigger": "aozaink_sigillum:tail_modifier_chaos",
+      "conditions": {}
+    }
+  },
+  "parent": "aozaink_sigillum:aozaink/root"
+}

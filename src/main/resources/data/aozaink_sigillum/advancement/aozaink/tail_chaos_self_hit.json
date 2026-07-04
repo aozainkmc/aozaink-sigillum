@@ -1,0 +1,29 @@
+{
+  "display": {
+    "show_toast": true,
+    "description": {
+      "text": "被自己的尾修暴乱炸中。"
+    },
+    "announce_to_chat": true,
+    "frame": "challenge",
+    "hidden": true,
+    "icon": {
+      "id": "aozaink_input:yellow_talisman",
+      "count": 1
+    },
+    "title": {
+      "text": "来不及了"
+    },
+    "x": 4.4,
+    "y": -0.5
+  },
+  "criteria": {
+    "done": {
+      "trigger": "aozaink_sigillum:tail_modifier_chaos",
+      "conditions": {
+        "hit_player": true
+      }
+    }
+  },
+  "parent": "aozaink_sigillum:aozaink/tail_modifier_chaos"
+}

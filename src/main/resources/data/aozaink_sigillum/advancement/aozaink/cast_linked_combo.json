@@ -1,0 +1,29 @@
+{
+  "display": {
+    "show_toast": true,
+    "description": {
+      "text": "第一次释放二字联动。"
+    },
+    "announce_to_chat": true,
+    "frame": "task",
+    "hidden": false,
+    "icon": {
+      "id": "aozaink_input:yellow_talisman",
+      "count": 1
+    },
+    "title": {
+      "text": "联字"
+    },
+    "x": 1.0,
+    "y": 2.2
+  },
+  "criteria": {
+    "done": {
+      "trigger": "aozaink_sigillum:talisman_cast",
+      "conditions": {
+        "linked": true
+      }
+    }
+  },
+  "parent": "aozaink_sigillum:aozaink/root"
+}

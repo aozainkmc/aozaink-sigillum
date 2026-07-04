@@ -1,0 +1,29 @@
+{
+  "display": {
+    "show_toast": true,
+    "description": {
+      "text": "第一次把刻印落在方块上。"
+    },
+    "announce_to_chat": true,
+    "frame": "task",
+    "hidden": false,
+    "icon": {
+      "id": "aozaink_input:yellow_talisman",
+      "count": 1
+    },
+    "title": {
+      "text": "入木三分"
+    },
+    "x": 3.4,
+    "y": 3.7
+  },
+  "criteria": {
+    "done": {
+      "trigger": "aozaink_sigillum:inscription_changed",
+      "conditions": {
+        "type": "created"
+      }
+    }
+  },
+  "parent": "aozaink_sigillum:aozaink/root"
+}

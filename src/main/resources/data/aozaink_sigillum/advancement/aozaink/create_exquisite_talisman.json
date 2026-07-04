@@ -1,0 +1,29 @@
+{
+  "display": {
+    "show_toast": true,
+    "description": {
+      "text": "第一次写出极品黄符。"
+    },
+    "announce_to_chat": true,
+    "frame": "goal",
+    "hidden": false,
+    "icon": {
+      "id": "aozaink_input:yellow_talisman",
+      "count": 1
+    },
+    "title": {
+      "text": "一气呵成"
+    },
+    "x": 3.0,
+    "y": -3.6
+  },
+  "criteria": {
+    "done": {
+      "trigger": "aozaink_sigillum:talisman_created",
+      "conditions": {
+        "grade": "exquisite"
+      }
+    }
+  },
+  "parent": "aozaink_sigillum:aozaink/create_first_talisman"
+}

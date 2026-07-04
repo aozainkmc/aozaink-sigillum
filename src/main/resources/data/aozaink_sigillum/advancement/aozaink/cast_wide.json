@@ -1,0 +1,30 @@
+{
+  "display": {
+    "show_toast": true,
+    "description": {
+      "text": "第一次广域命中或支援至少两个目标。"
+    },
+    "announce_to_chat": true,
+    "frame": "goal",
+    "hidden": false,
+    "icon": {
+      "id": "aozaink_input:yellow_talisman",
+      "count": 1
+    },
+    "title": {
+      "text": "波及四方"
+    },
+    "x": 3.4,
+    "y": 1.0
+  },
+  "criteria": {
+    "done": {
+      "trigger": "aozaink_sigillum:talisman_cast",
+      "conditions": {
+        "modifier": "广",
+        "min_count": 2
+      }
+    }
+  },
+  "parent": "aozaink_sigillum:aozaink/root"
+}

@@ -1,0 +1,29 @@
+{
+  "display": {
+    "show_toast": true,
+    "description": {
+      "text": "第一次由额外护盾吸收伤害。"
+    },
+    "announce_to_chat": true,
+    "frame": "task",
+    "hidden": false,
+    "icon": {
+      "id": "aozaink_input:yellow_talisman",
+      "count": 1
+    },
+    "title": {
+      "text": "盾先承之"
+    },
+    "x": 1.0,
+    "y": 0.3
+  },
+  "criteria": {
+    "done": {
+      "trigger": "aozaink_sigillum:shield_event",
+      "conditions": {
+        "type": "absorbed"
+      }
+    }
+  },
+  "parent": "aozaink_sigillum:aozaink/root"
+}

@@ -1,0 +1,31 @@
+{
+  "display": {
+    "show_toast": true,
+    "description": {
+      "text": "广域护或净第一次支援到其他玩家。"
+    },
+    "announce_to_chat": true,
+    "frame": "goal",
+    "hidden": false,
+    "icon": {
+      "id": "aozaink_input:yellow_talisman",
+      "count": 1
+    },
+    "title": {
+      "text": "余荫及人"
+    },
+    "x": 4.4,
+    "y": 1.4
+  },
+  "criteria": {
+    "done": {
+      "trigger": "aozaink_sigillum:shield_event",
+      "conditions": {
+        "min_count": 2,
+        "type": "shared",
+        "shared": true
+      }
+    }
+  },
+  "parent": "aozaink_sigillum:aozaink/cast_wide"
+}

@@ -1,0 +1,29 @@
+{
+  "display": {
+    "show_toast": true,
+    "description": {
+      "text": "第一次释放单技能加两个尾修的黄符。"
+    },
+    "announce_to_chat": true,
+    "frame": "goal",
+    "hidden": false,
+    "icon": {
+      "id": "aozaink_input:yellow_talisman",
+      "count": 1
+    },
+    "title": {
+      "text": "两重尾意"
+    },
+    "x": 4.4,
+    "y": -1.4
+  },
+  "criteria": {
+    "done": {
+      "trigger": "aozaink_sigillum:talisman_cast",
+      "conditions": {
+        "special": "single_skill_double_modifier"
+      }
+    }
+  },
+  "parent": "aozaink_sigillum:aozaink/tail_modifier_success"
+}
