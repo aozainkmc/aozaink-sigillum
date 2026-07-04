@@ -28,6 +28,8 @@ public final class SigillumInscriptionOverlay {
     private static final int RENDER_DISTANCE_BUFFER_BLOCKS = 16;
     private static final float WIDTH = 1.0f;
     private static final float HEIGHT = 0.12f;
+    private static final int BARRIER_SEGMENTS = 16;
+    private static final int BARRIER_RINGS = 7;
     private static final Map<Long, Entry> ENTRIES = new HashMap<>();
 
     private SigillumInscriptionOverlay() {}
@@ -37,7 +39,7 @@ public final class SigillumInscriptionOverlay {
         if (minecraft.level == null) return;
         long expiresAt = minecraft.level.getGameTime() + TTL_TICKS;
         for (InscriptionStatusPayload.Entry entry : entries) {
-            ENTRIES.put(entry.posLong(), new Entry(entry.progress(), expiresAt));
+            ENTRIES.put(entry.posLong(), new Entry(entry.progress(), entry.radius(), entry.ward(), expiresAt));
         }
     }
 
@@ -62,7 +64,7 @@ public final class SigillumInscriptionOverlay {
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
         RenderSystem.disableCull();
-        RenderSystem.disableDepthTest();
+        RenderSystem.enableDepthTest();
         RenderSystem.depthMask(false);
         RenderSystem.setShader(GameRenderer::getPositionColorShader);
 
@@ -78,14 +80,18 @@ public final class SigillumInscriptionOverlay {
 
         for (Map.Entry<Long, Entry> mapEntry : ENTRIES.entrySet()) {
             BlockPos pos = BlockPos.of(mapEntry.getKey());
+            Entry entry = mapEntry.getValue();
+            if (entry.ward) {
+                Vec3 center = Vec3.atCenterOf(pos).subtract(cameraPos);
+                renderWardBarrier(builder, matrix, center, right, up, entry);
+            }
             Vec3 display = displayPosition(minecraft.level, pos);
             Vec3 relative = display.subtract(cameraPos);
-            renderBar(builder, matrix, relative, right, up, mapEntry.getValue().progress);
+            renderBar(builder, matrix, relative, right, up, entry.progress);
         }
 
         BufferUploader.drawWithShader(builder.buildOrThrow());
         RenderSystem.depthMask(true);
-        RenderSystem.enableDepthTest();
         RenderSystem.enableCull();
         RenderSystem.disableBlend();
     }
@@ -107,12 +113,123 @@ public final class SigillumInscriptionOverlay {
         Vec3 fillCenter = center.subtract(right.scale((WIDTH - fillWidth) * 0.5));
         Vec3 fr = right.scale(fillWidth * 0.5);
         quad(builder, matrix, fillCenter.subtract(fr).subtract(h.scale(0.65)), fillCenter.add(fr).subtract(h.scale(0.65)),
-            fillCenter.add(fr).add(h.scale(0.65)), fillCenter.subtract(fr).add(h.scale(0.65)), 0xEE2EA8FF);
+            fillCenter.add(fr).add(h.scale(0.65)), fillCenter.subtract(fr).add(h.scale(0.65)), 0xEECF9A28);
 
         Vec3 shineCenter = fillCenter.add(up.scale(HEIGHT * 0.23));
         Vec3 sh = up.scale(HEIGHT * 0.12);
         quad(builder, matrix, shineCenter.subtract(fr), shineCenter.add(fr),
-            shineCenter.add(fr).add(sh), shineCenter.subtract(fr).add(sh), 0xCCBDEBFF);
+            shineCenter.add(fr).add(sh), shineCenter.subtract(fr).add(sh), 0xCCEDE1A8);
+    }
+
+    private static void renderWardBarrier(BufferBuilder builder, Matrix4f matrix, Vec3 anchor,
+            Vec3 cameraRight, Vec3 cameraUp, Entry entry) {
+        double radius = Math.max(2.5, entry.radius);
+        Vec3 center = anchor;
+        Vec3 top = center.add(0.0, radius, 0.0);
+        Vec3 bottom = center.add(0.0, -radius, 0.0);
+        Vec3[][] rings = barrierRings(center, radius);
+
+        int veil = alphaColor(0x12F3C86A, entry.progress);
+        int topRing = rings.length - 1;
+        for (int i = 0; i < BARRIER_SEGMENTS; i++) {
+            int next = (i + 1) % BARRIER_SEGMENTS;
+            triangle(builder, matrix, top, rings[topRing][i], rings[topRing][next], veil);
+            triangle(builder, matrix, bottom, rings[0][next], rings[0][i], veil);
+        }
+        for (int ring = 0; ring < rings.length - 1; ring++) {
+            for (int i = 0; i < BARRIER_SEGMENTS; i++) {
+                int next = (i + 1) % BARRIER_SEGMENTS;
+                triangle(builder, matrix, rings[ring][i], rings[ring + 1][i], rings[ring + 1][next], veil);
+                triangle(builder, matrix, rings[ring][i], rings[ring + 1][next], rings[ring][next], veil);
+            }
+        }
+
+        for (Vec3[] ring : rings) {
+            for (int i = 0; i < BARRIER_SEGMENTS; i++) {
+                int next = (i + 1) % BARRIER_SEGMENTS;
+                renderGoldLine(builder, matrix, ring[i], ring[next], cameraRight, cameraUp, 0.026, entry.progress);
+            }
+        }
+        for (int i = 0; i < BARRIER_SEGMENTS; i++) {
+            renderGoldLine(builder, matrix, bottom, rings[0][i], cameraRight, cameraUp, 0.022, entry.progress);
+            renderGoldLine(builder, matrix, rings[topRing][i], top, cameraRight, cameraUp, 0.022, entry.progress);
+            for (int ring = 0; ring < rings.length - 1; ring++) {
+                int next = (i + 1) % BARRIER_SEGMENTS;
+                renderGoldLine(builder, matrix, rings[ring][i], rings[ring + 1][i], cameraRight, cameraUp, 0.022, entry.progress);
+                renderGoldLine(builder, matrix, rings[ring][i], rings[ring + 1][next], cameraRight, cameraUp, 0.018, entry.progress);
+            }
+        }
+
+        renderNode(builder, matrix, top, cameraRight, cameraUp, 0.14, entry.progress);
+        renderNode(builder, matrix, bottom, cameraRight, cameraUp, 0.14, entry.progress);
+        for (int i = 0; i < BARRIER_SEGMENTS; i++) {
+            for (Vec3[] ring : rings) {
+                renderNode(builder, matrix, ring[i], cameraRight, cameraUp, 0.11, entry.progress);
+            }
+        }
+    }
+
+    private static Vec3[][] barrierRings(Vec3 center, double radius) {
+        Vec3[][] rings = new Vec3[BARRIER_RINGS][BARRIER_SEGMENTS];
+        double step = Math.PI / (BARRIER_RINGS + 1);
+        for (int ring = 0; ring < BARRIER_RINGS; ring++) {
+            double latitude = -Math.PI * 0.5 + step * (ring + 1);
+            double ringRadius = radius * Math.cos(latitude);
+            double y = radius * Math.sin(latitude);
+            double offset = ring % 2 == 0 ? 0.0 : Math.PI / BARRIER_SEGMENTS;
+            for (int i = 0; i < BARRIER_SEGMENTS; i++) {
+                double angle = offset + Math.PI * 2.0 * i / BARRIER_SEGMENTS;
+                rings[ring][i] = center.add(Math.cos(angle) * ringRadius, y, Math.sin(angle) * ringRadius);
+            }
+        }
+        return rings;
+    }
+
+    private static void renderGoldLine(BufferBuilder builder, Matrix4f matrix, Vec3 a, Vec3 b,
+            Vec3 cameraRight, Vec3 cameraUp, double width, float progress) {
+        lineQuad(builder, matrix, a, b, cameraRight, cameraUp, width * 2.2, alphaColor(0x36E8B448, progress));
+        lineQuad(builder, matrix, a, b, cameraRight, cameraUp, width, alphaColor(0xB8FFE8A6, progress));
+        lineQuad(builder, matrix, a, b, cameraRight, cameraUp, width * 0.35, alphaColor(0xA0B84A1B, progress));
+    }
+
+    private static void renderNode(BufferBuilder builder, Matrix4f matrix, Vec3 center,
+            Vec3 cameraRight, Vec3 cameraUp, double size, float progress) {
+        billboard(builder, matrix, center, cameraRight, cameraUp, size * 1.8, alphaColor(0x34F4C75E, progress));
+        billboard(builder, matrix, center, cameraRight, cameraUp, size, alphaColor(0xE8FFF2BD, progress));
+        billboard(builder, matrix, center, cameraRight, cameraUp, size * 0.42, alphaColor(0xE0B9371E, progress));
+    }
+
+    private static void lineQuad(BufferBuilder builder, Matrix4f matrix, Vec3 a, Vec3 b,
+            Vec3 cameraRight, Vec3 cameraUp, double width, int argb) {
+        Vec3 line = b.subtract(a);
+        double x = line.dot(cameraRight);
+        double y = line.dot(cameraUp);
+        Vec3 normal = cameraRight.scale(-y).add(cameraUp.scale(x));
+        if (normal.lengthSqr() < 0.0001) {
+            normal = cameraUp;
+        } else {
+            normal = normal.normalize();
+        }
+        Vec3 half = normal.scale(width * 0.5);
+        quad(builder, matrix, a.subtract(half), b.subtract(half), b.add(half), a.add(half), argb);
+    }
+
+    private static void billboard(BufferBuilder builder, Matrix4f matrix, Vec3 center,
+            Vec3 right, Vec3 up, double size, int argb) {
+        Vec3 r = right.scale(size * 0.5);
+        Vec3 u = up.scale(size * 0.5);
+        quad(builder, matrix, center.subtract(r).subtract(u), center.add(r).subtract(u),
+            center.add(r).add(u), center.subtract(r).add(u), argb);
+    }
+
+    private static void triangle(BufferBuilder builder, Matrix4f matrix, Vec3 a, Vec3 b, Vec3 c, int argb) {
+        quad(builder, matrix, a, b, c, c, argb);
+    }
+
+    private static int alphaColor(int argb, float progress) {
+        float life = Math.max(0.35f, Math.min(1.0f, progress));
+        int alpha = Math.round(((argb >>> 24) & 0xFF) * life);
+        return (alpha << 24) | (argb & 0x00FFFFFF);
     }
 
     private static void quad(BufferBuilder builder, Matrix4f matrix, Vec3 a, Vec3 b, Vec3 c, Vec3 d, int argb) {
@@ -155,5 +272,5 @@ public final class SigillumInscriptionOverlay {
         return best == null ? Vec3.atCenterOf(pos).add(0.0, 1.35, 0.0) : Vec3.atCenterOf(best).add(0.0, 0.35, 0.0);
     }
 
-    private record Entry(float progress, long expiresAt) {}
+    private record Entry(float progress, float radius, boolean ward, long expiresAt) {}
 }

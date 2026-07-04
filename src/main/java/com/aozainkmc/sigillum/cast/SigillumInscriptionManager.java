@@ -27,11 +27,13 @@ import net.minecraft.tags.EntityTypeTags;
 import net.minecraft.world.effect.MobEffectCategory;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LightningBolt;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.monster.Enemy;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.projectile.AbstractArrow;
 import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
@@ -44,8 +46,10 @@ public final class SigillumInscriptionManager {
     private static final int MAX_TICKS = 20 * 60 * 60 * 24;
     private static final int SHIELD_ENERGY_FACTOR = 5;
     private static final int STATUS_SYNC_BUFFER_BLOCKS = 16;
-    private static final DustParticleOptions SHIELD_GRID_PARTICLE =
-        new DustParticleOptions(new Vector3f(0.12f, 0.72f, 1.0f), 0.8f);
+    private static final DustParticleOptions SHIELD_GOLD_PARTICLE =
+        new DustParticleOptions(new Vector3f(1.0f, 0.78f, 0.22f), 0.75f);
+    private static final DustParticleOptions SHIELD_CINNABAR_PARTICLE =
+        new DustParticleOptions(new Vector3f(0.78f, 0.12f, 0.05f), 0.55f);
 
     private SigillumInscriptionManager() {}
 
@@ -228,6 +232,9 @@ public final class SigillumInscriptionManager {
                     iterator.remove();
                     continue;
                 }
+                if (entry.blockProjectiles(level, Vec3.atCenterOf(entry.pos))) {
+                    changed = true;
+                }
                 if (entry.tick(level)) {
                     changed = true;
                 }
@@ -271,6 +278,32 @@ public final class SigillumInscriptionManager {
 
         private String name() {
             return String.join("+", skills);
+        }
+
+        private boolean blockProjectiles(ServerLevel level, Vec3 center) {
+            if (!skills.contains("护")) return false;
+            AABB box = new AABB(pos).inflate(radius + 1.0);
+            List<AbstractArrow> arrows = level.getEntitiesOfClass(AbstractArrow.class, box, AbstractArrow::isAlive);
+            boolean changed = false;
+            double radiusSqr = radius * radius;
+            for (AbstractArrow arrow : arrows) {
+                if (isPlayerArrow(arrow)) continue;
+                Vec3 arrowPos = arrow.position();
+                if (arrowPos.distanceToSqr(center) > radiusSqr) continue;
+                arrow.discard();
+                energy = Math.max(0, energy - 5);
+                level.sendParticles(SHIELD_GOLD_PARTICLE, arrowPos.x, arrowPos.y, arrowPos.z,
+                    12, 0.25, 0.25, 0.25, 0.02);
+                level.sendParticles(SHIELD_CINNABAR_PARTICLE, arrowPos.x, arrowPos.y, arrowPos.z,
+                    2, 0.08, 0.08, 0.08, 0.0);
+                changed = true;
+            }
+            return changed;
+        }
+
+        private boolean isPlayerArrow(AbstractArrow arrow) {
+            Entity owner = arrow.getOwner();
+            return owner instanceof Player;
         }
 
         private boolean tick(ServerLevel level) {
@@ -549,42 +582,20 @@ public final class SigillumInscriptionManager {
         }
 
         private void drawShieldGrid(ServerLevel level, Vec3 anchor) {
-            double verticalRadius = Math.max(3.0, Math.min(radius * 0.7, 8.0));
-            double sphereY = anchor.y + verticalRadius * 0.62;
-            double phase = (level.getGameTime() % 240L) * (Math.PI * 2.0 / 240.0);
-            int latitudeBands = strong ? 6 : 5;
-            int meridians = strong ? 10 : 8;
-
-            for (int band = 1; band <= latitudeBands; band++) {
-                double latitude = -Math.PI * 0.42 + band * (Math.PI * 0.84 / (latitudeBands + 1));
-                double ringRadius = radius * Math.cos(latitude);
-                double y = sphereY + verticalRadius * Math.sin(latitude);
-                int samples = Math.max(8, Math.min(18, (int)Math.round(ringRadius * 1.25)));
-                for (int i = 0; i < samples; i++) {
-                    double angle = phase * 0.35 + (Math.PI * 2.0 * i) / samples;
-                    double x = anchor.x + Math.cos(angle) * ringRadius;
-                    double z = anchor.z + Math.sin(angle) * ringRadius;
-                    level.sendParticles(SHIELD_GRID_PARTICLE, x, y, z, 1, 0.0, 0.0, 0.0, 0.0);
-                }
-            }
-
-            int verticalSamples = strong ? 8 : 7;
-            for (int meridian = 0; meridian < meridians; meridian++) {
-                double angle = phase + (Math.PI * 2.0 * meridian) / meridians;
-                for (int i = 1; i <= verticalSamples; i++) {
-                    double latitude = -Math.PI * 0.46 + i * (Math.PI * 0.92 / (verticalSamples + 1));
-                    double ringRadius = radius * Math.cos(latitude);
-                    double x = anchor.x + Math.cos(angle) * ringRadius;
-                    double y = sphereY + verticalRadius * Math.sin(latitude);
-                    double z = anchor.z + Math.sin(angle) * ringRadius;
-                    level.sendParticles(SHIELD_GRID_PARTICLE, x, y, z, 1, 0.0, 0.0, 0.0, 0.0);
-                }
+            for (int i = 0; i < 3; i++) {
+                double angle = level.random.nextDouble() * Math.PI * 2.0;
+                double height = anchor.y + (level.random.nextDouble() * 2.0 - 1.0) * radius;
+                double shell = radius * Math.sqrt(level.random.nextDouble());
+                double x = anchor.x + Math.cos(angle) * shell;
+                double z = anchor.z + Math.sin(angle) * shell;
+                level.sendParticles(level.random.nextInt(5) == 0 ? SHIELD_CINNABAR_PARTICLE : SHIELD_GOLD_PARTICLE,
+                    x, height, z, 1, 0.0, -0.02, 0.0, 0.0);
             }
         }
 
         private void syncStatus(ServerLevel level, Vec3 center) {
             InscriptionStatusPayload payload = new InscriptionStatusPayload(
-                List.of(new InscriptionStatusPayload.Entry(pos.asLong(), progress()))
+                List.of(new InscriptionStatusPayload.Entry(pos.asLong(), progress(), (float) radius, skills.contains("护")))
             );
             double maxDistanceSqr = statusSyncDistanceSqr(level);
             for (ServerPlayer player : level.players()) {

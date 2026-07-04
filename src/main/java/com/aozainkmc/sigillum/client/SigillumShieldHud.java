@@ -50,8 +50,8 @@ public final class SigillumShieldHud {
         int fill = Math.max(1, Math.round(BAR_WIDTH * progress));
 
         graphics.fill(x - 1, y - 1, x + BAR_WIDTH + 1, y + BAR_HEIGHT + 1, 0x99000000);
-        graphics.fill(x, y, x + BAR_WIDTH, y + BAR_HEIGHT, 0xAA2A3340);
-        graphics.fill(x, y, x + fill, y + BAR_HEIGHT, 0xE831A8FF);
-        graphics.fill(x, y, x + fill, y + 1, 0xF0BDEBFF);
+        graphics.fill(x, y, x + BAR_WIDTH, y + BAR_HEIGHT, 0xAA2A2214);
+        graphics.fill(x, y, x + fill, y + BAR_HEIGHT, 0xEECF9A28);
+        graphics.fill(x, y, x + fill, y + 1, 0xF0F5E0A8);
     }
 }

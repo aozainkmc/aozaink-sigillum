@@ -19,13 +19,15 @@ public record InscriptionStatusPayload(List<Entry> entries) implements CustomPac
                 for (Entry entry : payload.entries) {
                     buffer.writeLong(entry.posLong());
                     buffer.writeFloat(entry.progress());
+                    buffer.writeFloat(entry.radius());
+                    buffer.writeBoolean(entry.ward());
                 }
             },
             buffer -> {
                 int size = buffer.readVarInt();
                 List<Entry> entries = new ArrayList<>(size);
                 for (int i = 0; i < size; i++) {
-                    entries.add(new Entry(buffer.readLong(), buffer.readFloat()));
+                    entries.add(new Entry(buffer.readLong(), buffer.readFloat(), buffer.readFloat(), buffer.readBoolean()));
                 }
                 return new InscriptionStatusPayload(entries);
             }
@@ -36,5 +38,5 @@ public record InscriptionStatusPayload(List<Entry> entries) implements CustomPac
         return TYPE;
     }
 
-    public record Entry(long posLong, float progress) {}
+    public record Entry(long posLong, float progress, float radius, boolean ward) {}
 }
