@@ -17,6 +17,9 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.monster.Enemy;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
@@ -30,6 +33,7 @@ public final class SigillumInscriptionOverlay {
     private static final float HEIGHT = 0.12f;
     private static final int BARRIER_SEGMENTS = 16;
     private static final int BARRIER_RINGS = 7;
+    private static final int SIGIL_SEGMENTS = 48;
     private static final Map<Long, Entry> ENTRIES = new HashMap<>();
 
     private SigillumInscriptionOverlay() {}
@@ -39,7 +43,7 @@ public final class SigillumInscriptionOverlay {
         if (minecraft.level == null) return;
         long expiresAt = minecraft.level.getGameTime() + TTL_TICKS;
         for (InscriptionStatusPayload.Entry entry : entries) {
-            ENTRIES.put(entry.posLong(), new Entry(entry.progress(), entry.radius(), entry.ward(), expiresAt));
+            ENTRIES.put(entry.posLong(), new Entry(entry.progress(), entry.radius(), entry.style(), expiresAt));
         }
     }
 
@@ -81,9 +85,17 @@ public final class SigillumInscriptionOverlay {
         for (Map.Entry<Long, Entry> mapEntry : ENTRIES.entrySet()) {
             BlockPos pos = BlockPos.of(mapEntry.getKey());
             Entry entry = mapEntry.getValue();
-            if (entry.ward) {
-                Vec3 center = Vec3.atCenterOf(pos).subtract(cameraPos);
+            Vec3 anchor = Vec3.atCenterOf(pos);
+            if (entry.ward()) {
+                Vec3 center = anchor.subtract(cameraPos);
                 renderWardBarrier(builder, matrix, center, right, up, entry);
+            } else {
+                renderGroundSigil(builder, matrix, minecraft.level, anchor, cameraPos, entry);
+                Vec3 lockTarget = lockTarget(minecraft, anchor, entry);
+                if (lockTarget != null) {
+                    renderLockRay(builder, matrix, anchor.add(0.0, 0.62, 0.0).subtract(cameraPos),
+                        lockTarget.subtract(cameraPos), right, up, entry.progress);
+                }
             }
             Vec3 display = displayPosition(minecraft.level, pos);
             Vec3 relative = display.subtract(cameraPos);
@@ -100,6 +112,82 @@ public final class SigillumInscriptionOverlay {
         int chunks = Math.max(2, minecraft.options.renderDistance().get());
         double blocks = chunks * 16.0 + RENDER_DISTANCE_BUFFER_BLOCKS;
         return blocks * blocks;
+    }
+
+    private static void renderGroundSigil(BufferBuilder builder, Matrix4f matrix, Level level,
+            Vec3 anchor, Vec3 cameraPos, Entry entry) {
+        double radius = Math.max(2.5, entry.radius);
+        double edgeWidth = 0.25;
+        double innerRadius = Math.max(0.75, radius - edgeWidth);
+        int edgeColor = alphaColor(0x5A360806, entry.progress);
+
+        for (int i = 0; i < SIGIL_SEGMENTS; i++) {
+            double a0 = Math.PI * 2.0 * i / SIGIL_SEGMENTS;
+            double a1 = Math.PI * 2.0 * (i + 1) / SIGIL_SEGMENTS;
+            groundQuad(builder, matrix, level, anchor, cameraPos,
+                polar(anchor, innerRadius, a0), polar(anchor, radius, a0), polar(anchor, radius, a1), polar(anchor, innerRadius, a1), edgeColor);
+        }
+    }
+
+    private static Vec3 lockTarget(Minecraft minecraft, Vec3 anchor, Entry entry) {
+        double radiusSqr = entry.radius * entry.radius;
+        if (entry.style == InscriptionStatusPayload.Entry.STYLE_SELF) {
+            return null;
+        }
+        if (entry.style != InscriptionStatusPayload.Entry.STYLE_HOSTILE || minecraft.level == null) {
+            return null;
+        }
+        LivingEntity best = null;
+        double bestDistance = Double.MAX_VALUE;
+        for (Entity entity : minecraft.level.entitiesForRendering()) {
+            if (!(entity instanceof LivingEntity living) || !(living instanceof Enemy) || !living.isAlive()) continue;
+            double distance = living.getBoundingBox().getCenter().distanceToSqr(anchor);
+            if (distance > radiusSqr || distance >= bestDistance) continue;
+            best = living;
+            bestDistance = distance;
+        }
+        return best == null ? null : best.getBoundingBox().getCenter();
+    }
+
+    private static void renderLockRay(BufferBuilder builder, Matrix4f matrix, Vec3 start, Vec3 end,
+            Vec3 cameraRight, Vec3 cameraUp, float progress) {
+        lineQuad(builder, matrix, start, end, cameraRight, cameraUp, 0.11, alphaColor(0x462A0504, progress));
+        lineQuad(builder, matrix, start, end, cameraRight, cameraUp, 0.055, alphaColor(0x8A4A0B07, progress));
+    }
+
+    private static void groundQuad(BufferBuilder builder, Matrix4f matrix, Level level, Vec3 anchor,
+            Vec3 cameraPos, Vec3 a, Vec3 b, Vec3 c, Vec3 d, int argb) {
+        quad(builder, matrix,
+            groundPoint(level, anchor, cameraPos, a),
+            groundPoint(level, anchor, cameraPos, b),
+            groundPoint(level, anchor, cameraPos, c),
+            groundPoint(level, anchor, cameraPos, d),
+            argb);
+    }
+
+    private static Vec3 groundPoint(Level level, Vec3 anchor, Vec3 cameraPos, Vec3 point) {
+        double y = surfaceY(level, anchor, point.x, point.z);
+        return new Vec3(point.x - cameraPos.x, y - cameraPos.y, point.z - cameraPos.z);
+    }
+
+    private static double surfaceY(Level level, Vec3 anchor, double x, double z) {
+        int blockX = (int)Math.floor(x);
+        int blockZ = (int)Math.floor(z);
+        int centerY = (int)Math.floor(anchor.y);
+        BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
+        BlockPos.MutableBlockPos above = new BlockPos.MutableBlockPos();
+        for (int y = centerY + 8; y >= centerY - 8; y--) {
+            cursor.set(blockX, y, blockZ);
+            above.set(blockX, y + 1, blockZ);
+            if (!level.getBlockState(cursor).isAir() && level.getBlockState(above).isAir()) {
+                return y + 1.018;
+            }
+        }
+        return anchor.y + 0.018;
+    }
+
+    private static Vec3 polar(Vec3 center, double radius, double angle) {
+        return center.add(Math.cos(angle) * radius, 0.0, Math.sin(angle) * radius);
     }
 
     private static void renderBar(BufferBuilder builder, Matrix4f matrix, Vec3 center, Vec3 right, Vec3 up, float progress) {
@@ -272,5 +360,9 @@ public final class SigillumInscriptionOverlay {
         return best == null ? Vec3.atCenterOf(pos).add(0.0, 1.35, 0.0) : Vec3.atCenterOf(best).add(0.0, 0.35, 0.0);
     }
 
-    private record Entry(float progress, float radius, boolean ward, long expiresAt) {}
+    private record Entry(float progress, float radius, int style, long expiresAt) {
+        private boolean ward() {
+            return style == InscriptionStatusPayload.Entry.STYLE_WARD;
+        }
+    }
 }

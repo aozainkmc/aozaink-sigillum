@@ -20,14 +20,14 @@ public record InscriptionStatusPayload(List<Entry> entries) implements CustomPac
                     buffer.writeLong(entry.posLong());
                     buffer.writeFloat(entry.progress());
                     buffer.writeFloat(entry.radius());
-                    buffer.writeBoolean(entry.ward());
+                    buffer.writeVarInt(entry.style());
                 }
             },
             buffer -> {
                 int size = buffer.readVarInt();
                 List<Entry> entries = new ArrayList<>(size);
                 for (int i = 0; i < size; i++) {
-                    entries.add(new Entry(buffer.readLong(), buffer.readFloat(), buffer.readFloat(), buffer.readBoolean()));
+                    entries.add(new Entry(buffer.readLong(), buffer.readFloat(), buffer.readFloat(), buffer.readVarInt()));
                 }
                 return new InscriptionStatusPayload(entries);
             }
@@ -38,5 +38,13 @@ public record InscriptionStatusPayload(List<Entry> entries) implements CustomPac
         return TYPE;
     }
 
-    public record Entry(long posLong, float progress, float radius, boolean ward) {}
+    public record Entry(long posLong, float progress, float radius, int style) {
+        public static final int STYLE_WARD = 0;
+        public static final int STYLE_HOSTILE = 1;
+        public static final int STYLE_SELF = 2;
+
+        public boolean ward() {
+            return style == STYLE_WARD;
+        }
+    }
 }

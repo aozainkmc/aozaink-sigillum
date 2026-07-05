@@ -33,7 +33,7 @@ import net.minecraft.world.entity.LightningBolt;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.monster.Enemy;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.entity.projectile.AbstractArrow;
+import net.minecraft.world.entity.projectile.Projectile;
 import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
@@ -283,26 +283,26 @@ public final class SigillumInscriptionManager {
         private boolean blockProjectiles(ServerLevel level, Vec3 center) {
             if (!skills.contains("护")) return false;
             AABB box = new AABB(pos).inflate(radius + 1.0);
-            List<AbstractArrow> arrows = level.getEntitiesOfClass(AbstractArrow.class, box, AbstractArrow::isAlive);
+            List<Projectile> projectiles = level.getEntitiesOfClass(Projectile.class, box, Projectile::isAlive);
             boolean changed = false;
             double radiusSqr = radius * radius;
-            for (AbstractArrow arrow : arrows) {
-                if (isPlayerArrow(arrow)) continue;
-                Vec3 arrowPos = arrow.position();
-                if (arrowPos.distanceToSqr(center) > radiusSqr) continue;
-                arrow.discard();
+            for (Projectile projectile : projectiles) {
+                if (isPlayerProjectile(projectile)) continue;
+                Vec3 projectilePos = projectile.position();
+                if (projectilePos.distanceToSqr(center) > radiusSqr) continue;
+                projectile.discard();
                 energy = Math.max(0, energy - 5);
-                level.sendParticles(SHIELD_GOLD_PARTICLE, arrowPos.x, arrowPos.y, arrowPos.z,
+                level.sendParticles(SHIELD_GOLD_PARTICLE, projectilePos.x, projectilePos.y, projectilePos.z,
                     12, 0.25, 0.25, 0.25, 0.02);
-                level.sendParticles(SHIELD_CINNABAR_PARTICLE, arrowPos.x, arrowPos.y, arrowPos.z,
+                level.sendParticles(SHIELD_CINNABAR_PARTICLE, projectilePos.x, projectilePos.y, projectilePos.z,
                     2, 0.08, 0.08, 0.08, 0.0);
                 changed = true;
             }
             return changed;
         }
 
-        private boolean isPlayerArrow(AbstractArrow arrow) {
-            Entity owner = arrow.getOwner();
+        private boolean isPlayerProjectile(Projectile projectile) {
+            Entity owner = projectile.getOwner();
             return owner instanceof Player;
         }
 
@@ -313,16 +313,23 @@ public final class SigillumInscriptionManager {
             AABB box = new AABB(pos).inflate(radius + 1.0);
             List<LivingEntity> entities = level.getEntitiesOfClass(LivingEntity.class, box, LivingEntity::isAlive);
             Set<UUID> present = new HashSet<>();
+            float power = multiplier * (strong ? 2.0f : 1.0f);
             for (LivingEntity entity : entities) {
                 if (entity.getBoundingBox().distanceToSqr(center) > radius * radius) continue;
                 present.add(entity.getUUID());
+                if (skills.contains("护") && entity instanceof Enemy) {
+                    wardBoundary(entity, center);
+                }
+                if (skills.contains("引")) {
+                    continuousLure(entity, center, power);
+                }
                 for (String skill : skills) {
                     if (energy <= 0) return true;
                     CooldownKey key = new CooldownKey(entity.getUUID(), skill);
                     if (cooldowns.getOrDefault(key, 0) > 0) continue;
                     int cooldown = cooldown(skill, entity);
                     if (apply(level, entity, skill, center)) {
-                        energy--;
+                        energy = Math.max(0, energy - energyCost(skill, entity, center));
                         cooldowns.put(key, cooldown);
                         changed = true;
                     }
@@ -358,7 +365,7 @@ public final class SigillumInscriptionManager {
             return switch (skill) {
                 case "镇" -> suppress(entity, power);
                 case "封" -> seal(entity, power);
-                case "退" -> repelAtEdge(entity, center, power, 1.25, false);
+                case "退" -> repel(entity, center, power);
                 case "引" -> lure(entity, center, power);
                 case "火" -> burn(level, entity, power);
                 case "雷" -> thunder(level, ownerPlayer, entity, power);
@@ -387,25 +394,48 @@ public final class SigillumInscriptionManager {
             return true;
         }
 
-        private boolean repelAtEdge(LivingEntity target, Vec3 center, float power, double strengthBase, boolean strictBarrier) {
+        private boolean lure(LivingEntity target, Vec3 center, float power) {
+            if (target instanceof Player) return false;
+            return applyHorizontalForce(target, center, false, 0.18 * Math.max(1.0f, power), 0.70 * Math.max(1.0f, power));
+        }
+
+        private void continuousLure(LivingEntity target, Vec3 center, float power) {
+            if (target instanceof Player) return;
+            applyHorizontalForce(target, center, false, 0.045 * Math.max(1.0f, power), 0.58 * Math.max(1.0f, power));
+        }
+
+        private boolean repel(LivingEntity target, Vec3 center, float power) {
+            if (target instanceof Player) return false;
             Vec3 delta = target.position().subtract(center);
-            double horizontal = Math.sqrt(delta.x * delta.x + delta.z * delta.z);
-            double edge = strictBarrier ? radius - 0.35 : radius - 0.9;
-            if (horizontal < edge) return false;
-            double strength = strengthBase * Math.max(0.5, power);
-            double dx = horizontal < 0.001 ? 0.0 : delta.x / horizontal;
-            double dz = horizontal < 0.001 ? 0.0 : delta.z / horizontal;
-            target.setDeltaMovement(target.getDeltaMovement().add(dx * strength, 0.25, dz * strength));
+            Vec3 horizontal = new Vec3(delta.x, 0.0, delta.z);
+            if (horizontal.lengthSqr() < 0.0001) {
+                horizontal = new Vec3(1.0, 0.0, 0.0);
+            }
+            Vec3 outward = horizontal.normalize();
+            double strength = 1.25 * Math.max(0.5, power);
+            target.setDeltaMovement(target.getDeltaMovement().add(outward.x * strength, 0.25, outward.z * strength));
             target.hurtMarked = true;
             return true;
         }
 
-        private boolean lure(LivingEntity target, Vec3 center, float power) {
-            if (target instanceof Player) return false;
-            Vec3 delta = center.subtract(target.position());
-            double length = delta.length();
-            if (length < 0.001) return false;
-            target.setDeltaMovement(target.getDeltaMovement().scale(0.4).add(delta.normalize().scale(0.35 * power)));
+        private boolean applyHorizontalForce(LivingEntity target, Vec3 center, boolean outward, double force, double maxSpeed) {
+            Vec3 delta = target.position().subtract(center);
+            Vec3 horizontal = new Vec3(delta.x, 0.0, delta.z);
+            if (horizontal.lengthSqr() < 0.0001) {
+                horizontal = new Vec3(1.0, 0.0, 0.0);
+            }
+            Vec3 direction = horizontal.normalize();
+            if (!outward) {
+                direction = direction.scale(-1.0);
+            }
+            Vec3 motion = target.getDeltaMovement().add(direction.scale(force));
+            Vec3 planar = new Vec3(motion.x, 0.0, motion.z);
+            double speed = planar.length();
+            if (speed > maxSpeed) {
+                Vec3 capped = planar.normalize().scale(maxSpeed);
+                motion = new Vec3(capped.x, motion.y, capped.z);
+            }
+            target.setDeltaMovement(motion);
             target.hurtMarked = true;
             return true;
         }
@@ -450,25 +480,93 @@ public final class SigillumInscriptionManager {
                 return true;
             }
             if (!(entity instanceof Enemy)) return false;
-            wardBarrier(entity, center, power);
             entity.invulnerableTime = 0;
-            entity.hurt(level.damageSources().magic(), 3.0f * Math.max(1.0f, power));
+            entity.hurt(level.damageSources().magic(), wardDamage(entity, center, power));
+            drawWardRipple(level, center, entity);
             return true;
         }
 
-        private void wardBarrier(LivingEntity target, Vec3 center, float power) {
+        private void wardBoundary(LivingEntity target, Vec3 center) {
             Vec3 entityCenter = target.getBoundingBox().getCenter();
             Vec3 horizontal = new Vec3(entityCenter.x - center.x, 0.0, entityCenter.z - center.z);
+            double distance = horizontal.length();
             if (horizontal.lengthSqr() < 0.0001) {
                 horizontal = new Vec3(1.0, 0.0, 0.0);
+                distance = 0.0;
             }
             Vec3 outward = horizontal.normalize();
-            double targetRadius = radius + Math.max(0.9, target.getBbWidth() * 0.5 + 0.5);
-            double x = center.x + outward.x * targetRadius;
-            double z = center.z + outward.z * targetRadius;
-            target.teleportTo(x, target.getY(), z);
-            target.setDeltaMovement(outward.scale(1.2 * Math.max(1.0f, power)).add(0.0, 0.18, 0.0));
+            double wallRadius = radius + Math.max(0.45, target.getBbWidth() * 0.5);
+            double boundaryBand = Math.max(1.25, target.getBbWidth() + 0.75);
+            boolean onBoundary = distance >= radius - boundaryBand;
+
+            Vec3 motion = target.getDeltaMovement();
+            if (onBoundary) {
+                if (distance < wallRadius) {
+                    double x = center.x + outward.x * wallRadius;
+                    double z = center.z + outward.z * wallRadius;
+                    target.teleportTo(x, target.getY(), z);
+                }
+                double radial = motion.x * outward.x + motion.z * outward.z;
+                Vec3 radialMotion = outward.scale(Math.max(0.0, radial));
+                Vec3 planarMotion = new Vec3(motion.x, 0.0, motion.z);
+                Vec3 tangential = planarMotion.subtract(outward.scale(radial));
+                motion = new Vec3(
+                    radialMotion.x + tangential.x * 0.35,
+                    motion.y,
+                    radialMotion.z + tangential.z * 0.35
+                );
+            } else {
+                target.addEffect(new MobEffectInstance(MobEffects.MOVEMENT_SLOWDOWN, 10, 6, false, false));
+                motion = Vec3.ZERO;
+            }
+            target.setDeltaMovement(motion);
             target.hurtMarked = true;
+        }
+
+        private float wardDamage(LivingEntity target, Vec3 center, float power) {
+            double distance = target.getBoundingBox().getCenter().distanceTo(center);
+            double proximity = 1.0 - Math.min(1.0, distance / Math.max(1.0, radius));
+            double pressure = 1.0 + proximity;
+            return (float)(3.0 * Math.max(1.0f, power) * pressure);
+        }
+
+        private int energyCost(String skill, LivingEntity entity, Vec3 center) {
+            if (!"护".equals(skill) || !(entity instanceof Enemy)) return 1;
+            double distance = entity.getBoundingBox().getCenter().distanceTo(center);
+            double proximity = 1.0 - Math.min(1.0, distance / Math.max(1.0, radius));
+            return proximity >= 0.5 ? 2 : 1;
+        }
+
+        private void drawWardRipple(ServerLevel level, Vec3 center, LivingEntity target) {
+            Vec3 delta = target.getBoundingBox().getCenter().subtract(center);
+            if (delta.lengthSqr() < 0.0001) {
+                delta = new Vec3(1.0, 0.0, 0.0);
+            }
+            Vec3 normal = delta.normalize();
+            Vec3 surface = center.add(normal.scale(radius));
+            Vec3 tangentA = new Vec3(-normal.z, 0.0, normal.x);
+            if (tangentA.lengthSqr() < 0.0001) {
+                tangentA = new Vec3(1.0, 0.0, 0.0);
+            } else {
+                tangentA = tangentA.normalize();
+            }
+            Vec3 tangentB = new Vec3(
+                normal.y * tangentA.z - normal.z * tangentA.y,
+                normal.z * tangentA.x - normal.x * tangentA.z,
+                normal.x * tangentA.y - normal.y * tangentA.x
+            ).normalize();
+            for (int ring = 0; ring < 2; ring++) {
+                double ringRadius = 0.45 + ring * 0.35;
+                int points = ring == 0 ? 10 : 16;
+                for (int i = 0; i < points; i++) {
+                    double angle = Math.PI * 2.0 * i / points;
+                    Vec3 point = surface
+                        .add(tangentA.scale(Math.cos(angle) * ringRadius))
+                        .add(tangentB.scale(Math.sin(angle) * ringRadius));
+                    level.sendParticles(ring == 0 ? SHIELD_GOLD_PARTICLE : SHIELD_CINNABAR_PARTICLE,
+                        point.x, point.y, point.z, 1, 0.0, 0.0, 0.0, 0.0);
+                }
+            }
         }
 
         private boolean purify(ServerLevel level, LivingEntity entity, float power) {
@@ -547,10 +645,11 @@ public final class SigillumInscriptionManager {
         }
 
         private int cooldown(String skill, LivingEntity entity) {
-            if ("护".equals(skill) && entity instanceof Enemy) return 1;
+            if ("护".equals(skill) && entity instanceof Enemy) return 20;
             return switch (skill) {
                 case "镇", "封", "吸", "净" -> 40;
-                case "退", "护" -> 20;
+                case "退" -> 10;
+                case "护" -> 20;
                 case "引" -> 15;
                 case "火" -> 80;
                 case "雷" -> 100;
@@ -564,21 +663,7 @@ public final class SigillumInscriptionManager {
         private void draw(ServerLevel level, Vec3 center) {
             if (skills.contains("护")) {
                 drawShieldGrid(level, center);
-                return;
             }
-            drawGroundCircle(level, center);
-        }
-
-        private void drawGroundCircle(ServerLevel level, Vec3 center) {
-            int points = Math.max(32, (int)Math.round(radius * 10.0));
-            for (int i = 0; i < points; i++) {
-                double angle = (Math.PI * 2.0 * i) / points;
-                double x = center.x + Math.cos(angle) * radius;
-                double z = center.z + Math.sin(angle) * radius;
-                level.sendParticles(ParticleTypes.WITCH, x, center.y + 0.2, z, 1, 0.0, 0.03, 0.0, 0.0);
-            }
-            level.sendParticles(ParticleTypes.WITCH, center.x, center.y + 0.7, center.z,
-                10, 0.35, 0.45, 0.35, 0.0);
         }
 
         private void drawShieldGrid(ServerLevel level, Vec3 anchor) {
@@ -595,7 +680,7 @@ public final class SigillumInscriptionManager {
 
         private void syncStatus(ServerLevel level, Vec3 center) {
             InscriptionStatusPayload payload = new InscriptionStatusPayload(
-                List.of(new InscriptionStatusPayload.Entry(pos.asLong(), progress(), (float) radius, skills.contains("护")))
+                List.of(new InscriptionStatusPayload.Entry(pos.asLong(), progress(), (float) radius, statusStyle()))
             );
             double maxDistanceSqr = statusSyncDistanceSqr(level);
             for (ServerPlayer player : level.players()) {
@@ -603,6 +688,16 @@ public final class SigillumInscriptionManager {
                     PacketDistributor.sendToPlayer(player, payload);
                 }
             }
+        }
+
+        private int statusStyle() {
+            if (skills.contains("护")) {
+                return InscriptionStatusPayload.Entry.STYLE_WARD;
+            }
+            if (skills.contains("净") || skills.contains("明") || skills.contains("魄")) {
+                return InscriptionStatusPayload.Entry.STYLE_SELF;
+            }
+            return InscriptionStatusPayload.Entry.STYLE_HOSTILE;
         }
 
         private static double statusSyncDistanceSqr(ServerLevel level) {
