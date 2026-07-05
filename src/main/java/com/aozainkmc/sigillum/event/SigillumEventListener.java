@@ -3,6 +3,7 @@ package com.aozainkmc.sigillum.event;
 import com.aozainkmc.sigillum.advancement.SigillumAdvancementTriggers;
 import com.aozainkmc.sigillum.SigillumMod;
 import com.aozainkmc.sigillum.binding.GlyphBinding;
+import com.aozainkmc.sigillum.cast.SkillCast;
 import com.aozainkmc.sigillum.glyph.GlyphSemantics;
 import com.aozainkmc.core.api.InkRecognitionResult;
 import com.aozainkmc.core.api.InkRecognizedEvent;
@@ -10,6 +11,7 @@ import com.aozainkmc.core.api.InkSource;
 import java.util.List;
 import java.util.Optional;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 
@@ -75,9 +77,12 @@ public final class SigillumEventListener {
     private static void onPaperCasting(InkRecognizedEvent event) {
         InkRecognitionResult result = event.result();
         InkSource source = event.source();
-        String word = result.topGlyph();
+        String word = normalizePaperDigit(result);
 
         if (!GlyphBinding.isChineseDigit(word)) {
+            event.setCanceled(true);
+            event.player().displayClientMessage(
+                Component.literal("[Sigillum] 白纸指定技只接受一至九"), false);
             return;
         }
 
@@ -90,11 +95,42 @@ public final class SigillumEventListener {
         }
 
         String glyph = bound.get();
-        if (event.player() instanceof net.minecraft.server.level.ServerPlayer serverPlayer) {
-            SigillumAdvancementTriggers.quickCast(serverPlayer, glyph);
+        if (!(event.player() instanceof ServerPlayer serverPlayer)) {
+            event.setCanceled(true);
+            return;
         }
+        if (!SkillCast.isImplementedSkill(glyph)) {
+            event.setCanceled(true);
+            event.player().displayClientMessage(
+                Component.literal("[Sigillum] 指定字 " + glyph + " 不是可用术式"), false);
+            return;
+        }
+
+        SkillCast.Outcome outcome = SkillCast.castQuick(serverPlayer, glyph, source.powerMultiplier());
+        event.setCanceled(true);
+        if (outcome == SkillCast.Outcome.MISS) {
+            event.player().displayClientMessage(
+                Component.literal("[Sigillum] 快速吟唱: " + word + " -> " + glyph + " · 未命中"), false);
+            return;
+        }
+        SigillumAdvancementTriggers.quickCast(serverPlayer, glyph);
         event.player().displayClientMessage(
             Component.literal("[Sigillum] 快速吟唱: " + word + " -> " + glyph
                 + " | 倍率: " + source.powerMultiplier()), false);
+    }
+
+    private static String normalizePaperDigit(InkRecognitionResult result) {
+        String word = result.topGlyph() == null ? "" : result.topGlyph().trim();
+        int strokes = result.simplifiedStrokeCount();
+        if (strokes == 1) {
+            return "一";
+        }
+        if (strokes == 2 && (!GlyphBinding.isChineseDigit(word) || "三".equals(word))) {
+            return "二";
+        }
+        if (strokes == 3 && (!GlyphBinding.isChineseDigit(word) || "二".equals(word))) {
+            return "三";
+        }
+        return word;
     }
 }

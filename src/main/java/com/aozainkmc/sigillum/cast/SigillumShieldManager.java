@@ -16,6 +16,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
 
 public final class SigillumShieldManager {
     private static final Map<UUID, ShieldState> SHIELDS = new HashMap<>();
+    private static final Map<UUID, Map<String, Long>> CONTINUOUS_BLOCK_UNTIL = new HashMap<>();
 
     private SigillumShieldManager() {}
 
@@ -77,6 +78,26 @@ public final class SigillumShieldManager {
         return Math.max(0.0f, remaining);
     }
 
+    public static float absorbContinuous(ServerPlayer player, float damage, String key, int cooldownTicks) {
+        if (damage <= 0.0f) return damage;
+        ShieldState state = SHIELDS.get(player.getUUID());
+        if (state == null || state.amount <= 0.0f) return damage;
+
+        UUID uuid = player.getUUID();
+        long now = player.serverLevel().getGameTime();
+        Map<String, Long> cooldowns = CONTINUOUS_BLOCK_UNTIL.get(uuid);
+        if (cooldowns != null && cooldowns.getOrDefault(key, 0L) > now) {
+            return 0.0f;
+        }
+
+        float remaining = absorb(player, damage);
+        if (remaining < damage && SHIELDS.containsKey(uuid)) {
+            CONTINUOUS_BLOCK_UNTIL.computeIfAbsent(uuid, ignored -> new HashMap<>())
+                .put(key, now + Math.max(1, cooldownTicks));
+        }
+        return remaining;
+    }
+
     public static void tick(MinecraftServer server) {
         if (SHIELDS.isEmpty()) return;
         Iterator<Map.Entry<UUID, ShieldState>> iterator = SHIELDS.entrySet().iterator();
@@ -85,6 +106,7 @@ public final class SigillumShieldManager {
             ServerPlayer player = server.getPlayerList().getPlayer(entry.getKey());
             if (player == null || !player.isAlive() || entry.getValue().amount <= 0.0f) {
                 iterator.remove();
+                CONTINUOUS_BLOCK_UNTIL.remove(entry.getKey());
                 if (player != null) {
                     sync(player, 0.0f, 0.0f);
                 }
@@ -94,11 +116,13 @@ public final class SigillumShieldManager {
 
     public static void clear(ServerPlayer player) {
         SHIELDS.remove(player.getUUID());
+        CONTINUOUS_BLOCK_UNTIL.remove(player.getUUID());
         sync(player, 0.0f, 0.0f);
     }
 
     public static void discard(ServerPlayer player) {
         SHIELDS.remove(player.getUUID());
+        CONTINUOUS_BLOCK_UNTIL.remove(player.getUUID());
     }
 
     public static void sync(ServerPlayer player) {

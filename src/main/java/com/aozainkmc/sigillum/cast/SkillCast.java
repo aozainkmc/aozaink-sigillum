@@ -43,6 +43,7 @@ public final class SkillCast {
     public static final double RANGE = 16.0;
     public static final double AOE_RADIUS = 4.0;
     private static final double TARGET_AIM_TOLERANCE = 0.35;
+    private static final double QUICK_CAST_AIM_TOLERANCE = 2.0;
     private static final float INFERIOR_SHIELD = 8.0f;
     private static final float FINE_SHIELD = 16.0f;
     private static final float EXQUISITE_SHIELD = 30.0f;
@@ -196,8 +197,16 @@ public final class SkillCast {
     }
 
     public static Outcome cast(ServerPlayer player, String glyph, CastEnv env) {
+        return cast(player, glyph, env, TARGET_AIM_TOLERANCE);
+    }
+
+    public static Outcome castQuick(ServerPlayer player, String glyph, float m) {
+        return cast(player, glyph, CastEnv.of(m), QUICK_CAST_AIM_TOLERANCE);
+    }
+
+    private static Outcome cast(ServerPlayer player, String glyph, CastEnv env, double aimTolerance) {
         TargetRequirement targetRequirement = targetRequirement(glyph);
-        LivingEntity target = targetRequirement == TargetRequirement.NONE ? null : targetLiving(player);
+        LivingEntity target = targetRequirement == TargetRequirement.NONE ? null : targetLiving(player, aimTolerance);
         if (targetRequirement == TargetRequirement.REQUIRED && target == null) return Outcome.MISS;
 
         boolean applied = false;
@@ -1175,15 +1184,19 @@ public final class SkillCast {
     }
 
     public static LivingEntity targetLiving(ServerPlayer player) {
+        return targetLiving(player, TARGET_AIM_TOLERANCE);
+    }
+
+    private static LivingEntity targetLiving(ServerPlayer player, double aimTolerance) {
         HitResult hr = ProjectileUtil.getHitResultOnViewVector(player,
             e -> e instanceof LivingEntity && e != player && e.isAlive(), RANGE);
         if (hr instanceof EntityHitResult ehr && ehr.getEntity() instanceof LivingEntity le) {
             return le;
         }
-        return forgivingTargetLiving(player);
+        return forgivingTargetLiving(player, aimTolerance);
     }
 
-    private static LivingEntity forgivingTargetLiving(ServerPlayer player) {
+    private static LivingEntity forgivingTargetLiving(ServerPlayer player, double aimTolerance) {
         Vec3 start = player.getEyePosition(1.0f);
         Vec3 maxEnd = start.add(player.getViewVector(1.0f).scale(RANGE));
         HitResult blockLimit = ProjectileUtil.getHitResultOnViewVector(player, e -> false, RANGE);
@@ -1191,10 +1204,10 @@ public final class SkillCast {
         double bestDistanceSqr = start.distanceToSqr(end);
         LivingEntity best = null;
 
-        AABB sweep = new AABB(start, end).inflate(TARGET_AIM_TOLERANCE);
+        AABB sweep = new AABB(start, end).inflate(aimTolerance);
         for (LivingEntity candidate : player.serverLevel().getEntitiesOfClass(LivingEntity.class, sweep,
                 e -> e != player && e.isAlive())) {
-            AABB targetBox = candidate.getBoundingBox().inflate(TARGET_AIM_TOLERANCE);
+            AABB targetBox = candidate.getBoundingBox().inflate(aimTolerance);
             double distanceSqr;
             if (targetBox.contains(start)) {
                 distanceSqr = 0.0;
