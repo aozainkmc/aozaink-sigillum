@@ -273,21 +273,21 @@ public final class SigillumInscriptionOverlay {
         return rings;
     }
 
-    private static void renderGoldLine(BufferBuilder builder, Matrix4f matrix, Vec3 a, Vec3 b,
+    public static void renderGoldLine(BufferBuilder builder, Matrix4f matrix, Vec3 a, Vec3 b,
             Vec3 cameraRight, Vec3 cameraUp, double width, float progress) {
         lineQuad(builder, matrix, a, b, cameraRight, cameraUp, width * 2.2, alphaColor(0x36E8B448, progress));
         lineQuad(builder, matrix, a, b, cameraRight, cameraUp, width, alphaColor(0xB8FFE8A6, progress));
         lineQuad(builder, matrix, a, b, cameraRight, cameraUp, width * 0.35, alphaColor(0xA0B84A1B, progress));
     }
 
-    private static void renderNode(BufferBuilder builder, Matrix4f matrix, Vec3 center,
+    public static void renderNode(BufferBuilder builder, Matrix4f matrix, Vec3 center,
             Vec3 cameraRight, Vec3 cameraUp, double size, float progress) {
         billboard(builder, matrix, center, cameraRight, cameraUp, size * 1.8, alphaColor(0x34F4C75E, progress));
         billboard(builder, matrix, center, cameraRight, cameraUp, size, alphaColor(0xE8FFF2BD, progress));
         billboard(builder, matrix, center, cameraRight, cameraUp, size * 0.42, alphaColor(0xE0B9371E, progress));
     }
 
-    private static void lineQuad(BufferBuilder builder, Matrix4f matrix, Vec3 a, Vec3 b,
+    public static void lineQuad(BufferBuilder builder, Matrix4f matrix, Vec3 a, Vec3 b,
             Vec3 cameraRight, Vec3 cameraUp, double width, int argb) {
         Vec3 line = b.subtract(a);
         double x = line.dot(cameraRight);
@@ -302,7 +302,7 @@ public final class SigillumInscriptionOverlay {
         quad(builder, matrix, a.subtract(half), b.subtract(half), b.add(half), a.add(half), argb);
     }
 
-    private static void billboard(BufferBuilder builder, Matrix4f matrix, Vec3 center,
+    public static void billboard(BufferBuilder builder, Matrix4f matrix, Vec3 center,
             Vec3 right, Vec3 up, double size, int argb) {
         Vec3 r = right.scale(size * 0.5);
         Vec3 u = up.scale(size * 0.5);
@@ -314,13 +314,13 @@ public final class SigillumInscriptionOverlay {
         quad(builder, matrix, a, b, c, c, argb);
     }
 
-    private static int alphaColor(int argb, float progress) {
+    public static int alphaColor(int argb, float progress) {
         float life = Math.max(0.35f, Math.min(1.0f, progress));
         int alpha = Math.round(((argb >>> 24) & 0xFF) * life);
         return (alpha << 24) | (argb & 0x00FFFFFF);
     }
 
-    private static void quad(BufferBuilder builder, Matrix4f matrix, Vec3 a, Vec3 b, Vec3 c, Vec3 d, int argb) {
+    public static void quad(BufferBuilder builder, Matrix4f matrix, Vec3 a, Vec3 b, Vec3 c, Vec3 d, int argb) {
         int alpha = (argb >>> 24) & 0xFF;
         int red = (argb >>> 16) & 0xFF;
         int green = (argb >>> 8) & 0xFF;

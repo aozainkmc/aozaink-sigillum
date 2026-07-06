@@ -4,12 +4,14 @@ import com.aozainkmc.sigillum.advancement.SigillumAdvancementTriggers;
 import com.aozainkmc.sigillum.SigillumMod;
 import com.aozainkmc.sigillum.binding.GlyphBinding;
 import com.aozainkmc.sigillum.cast.SkillCast;
+import com.aozainkmc.sigillum.dev.SigillumDevMode;
 import com.aozainkmc.sigillum.glyph.GlyphSemantics;
 import com.aozainkmc.core.api.InkRecognitionResult;
 import com.aozainkmc.core.api.InkRecognizedEvent;
 import com.aozainkmc.core.api.InkSource;
 import java.util.List;
 import java.util.Optional;
+import com.aozainkmc.sigillum.util.SigillumTexts;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -37,6 +39,10 @@ public final class SigillumEventListener {
             return;
         }
 
+        if (!SigillumDevMode.isEnabled(event.player())) {
+            return;
+        }
+
         StringBuilder builder = new StringBuilder();
         builder.append("[Sigillum] 字: ").append(word);
         builder.append(" | 源: ").append(source.sourceId());
@@ -55,6 +61,10 @@ public final class SigillumEventListener {
     }
 
     private static void onTalismanRecognized(InkRecognizedEvent event, String type) {
+        if (!SigillumDevMode.isEnabled(event.player())) {
+            return;
+        }
+
         InkRecognitionResult result = event.result();
         InkSource source = event.source();
         String slot = (String) source.extra().get("slot");
@@ -81,16 +91,14 @@ public final class SigillumEventListener {
 
         if (!GlyphBinding.isChineseDigit(word)) {
             event.setCanceled(true);
-            event.player().displayClientMessage(
-                Component.literal("[Sigillum] 白纸指定技只接受一至九"), false);
+            SigillumTexts.actionbar(event.player(), "白纸指定技只接受一至九", SigillumTexts.CINNABAR);
             return;
         }
 
         Optional<String> bound = GlyphBinding.getBoundGlyph(event.player(), word);
         if (bound.isEmpty()) {
             event.setCanceled(true);
-            event.player().displayClientMessage(
-                Component.literal("[Sigillum] 数字 " + word + " 未指定"), false);
+            SigillumTexts.actionbar(event.player(), "数字 " + word + " 未指定", SigillumTexts.CINNABAR);
             return;
         }
 
@@ -101,22 +109,27 @@ public final class SigillumEventListener {
         }
         if (!SkillCast.isImplementedSkill(glyph)) {
             event.setCanceled(true);
-            event.player().displayClientMessage(
-                Component.literal("[Sigillum] 指定字 " + glyph + " 不是可用术式"), false);
+            SigillumTexts.actionbar(event.player(), "指定字 " + glyph + " 不是可用术式", SigillumTexts.CINNABAR);
             return;
         }
 
         SkillCast.Outcome outcome = SkillCast.castQuick(serverPlayer, glyph, source.powerMultiplier());
         event.setCanceled(true);
         if (outcome == SkillCast.Outcome.MISS) {
-            event.player().displayClientMessage(
-                Component.literal("[Sigillum] 快速吟唱: " + word + " -> " + glyph + " · 未命中"), false);
+            TalismanUseHandler.spawnMissFeedback(serverPlayer.serverLevel(), SkillCast.landPoint(serverPlayer));
+            SigillumTexts.actionbar(event.player(),
+                Component.empty()
+                    .append(SigillumTexts.colored("快速吟唱：", SigillumTexts.GOLD))
+                    .append(SigillumTexts.colored(word + " → " + glyph, SigillumTexts.GOLD))
+                    .append(SigillumTexts.colored(" · 未着", SigillumTexts.CINNABAR)));
             return;
         }
         SigillumAdvancementTriggers.quickCast(serverPlayer, glyph);
-        event.player().displayClientMessage(
-            Component.literal("[Sigillum] 快速吟唱: " + word + " -> " + glyph
-                + " | 倍率: " + source.powerMultiplier()), false);
+        SigillumTexts.actionbar(event.player(),
+            Component.empty()
+                .append(SigillumTexts.colored("快速吟唱：", SigillumTexts.GOLD))
+                .append(SigillumTexts.colored(word + " → " + glyph, SigillumTexts.GOLD))
+                .append(SigillumTexts.colored(" | 倍率: " + source.powerMultiplier(), SigillumTexts.CREAM)));
     }
 
     private static String normalizePaperDigit(InkRecognitionResult result) {

@@ -27,5 +27,6 @@ public final class SigillumClientEvents {
     @SubscribeEvent
     public static void onRenderLevel(RenderLevelStageEvent event) {
         SigillumInscriptionOverlay.render(event);
+        SigillumBindingOverlay.render(event);
     }
 }

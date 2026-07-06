@@ -1,5 +1,7 @@
 package com.aozainkmc.sigillum.event;
 
+import com.aozainkmc.sigillum.network.BindingRitualPayload;
+import com.aozainkmc.sigillum.util.SigillumTexts;
 import com.aozainkmc.sigillum.advancement.SigillumAdvancementTriggers;
 import com.aozainkmc.sigillum.advancement.SigillumCriterionTrigger;
 import com.aozainkmc.sigillum.SigillumMod;
@@ -15,12 +17,18 @@ import java.util.UUID;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.component.DataComponents;
+import net.minecraft.core.particles.DustParticleOptions;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.HoverEvent;
+import net.minecraft.network.chat.Style;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
@@ -36,6 +44,8 @@ import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
+import net.neoforged.neoforge.network.PacketDistributor;
+import org.joml.Vector3f;
 
 @EventBusSubscriber(modid = SigillumMod.MOD_ID)
 public final class TalismanUseHandler {
@@ -46,6 +56,8 @@ public final class TalismanUseHandler {
     private static final String TAG_SLOT3 = "aozaink:slot3";
     private static final ResourceLocation YELLOW_TALISMAN_ITEM =
         ResourceLocation.fromNamespaceAndPath("aozaink_input", "yellow_talisman");
+    private static final DustParticleOptions MISS_CINNABAR_PARTICLE =
+        new DustParticleOptions(new Vector3f(0.52f, 0.07f, 0.035f), 0.42f);
 
     private TalismanUseHandler() {}
 
@@ -112,15 +124,56 @@ public final class TalismanUseHandler {
 
     private static void useSpecified(ServerPlayer player, String number, String glyph) {
         if (!GlyphBinding.isChineseDigit(number)) {
-            notice(player, "指定符数字无效");
+            SigillumTexts.actionbar(player, "指定符数字无效", SigillumTexts.CINNABAR);
             return;
         }
 
         GlyphBinding.bind(player, number, glyph);
         SigillumAdvancementTriggers.specifiedBound(player, glyph);
-        notice(player, "已指定 " + number + " → " + glyph);
-        spawnFlameBurst(player.serverLevel(), player.position());
+
+        SigillumTexts.actionbar(player,
+            SigillumTexts.colored(number + " → " + glyph + " 绑定完成", SigillumTexts.GOLD));
+
+        Component message = Component.empty()
+            .append(SigillumTexts.colored("已指定 ", SigillumTexts.CREAM))
+            .append(SigillumTexts.colored(number, SigillumTexts.GOLD))
+            .append(SigillumTexts.colored(" → ", SigillumTexts.CREAM))
+            .append(SigillumTexts.colored(glyph, SigillumTexts.GOLD))
+            .append(SigillumTexts.colored("（" + elementName(glyph) + "） ", SigillumTexts.CREAM))
+            .append(Component.literal("[点击查看]")
+                .withStyle(Style.EMPTY
+                    .withColor(SigillumTexts.GOLD)
+                    .withUnderlined(true)
+                    .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/sigillum menu"))
+                    .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
+                        Component.literal("打开快速吟唱设置")))));
+        player.sendSystemMessage(message, false);
+
+        ServerLevel level = player.serverLevel();
+        Vec3 center = player.position();
+        level.playSound(null, player.blockPosition(), SoundEvents.BEACON_POWER_SELECT,
+            SoundSource.PLAYERS, 0.7f, 1.5f);
+        level.playSound(null, player.blockPosition(), SoundEvents.EXPERIENCE_ORB_PICKUP,
+            SoundSource.PLAYERS, 0.3f, 1.3f);
+        PacketDistributor.sendToPlayer(player, new BindingRitualPayload(center.x, center.y, center.z));
+
         consumeOne(player);
+    }
+
+    private static String elementName(String glyph) {
+        return switch (glyph) {
+            case "火" -> "离火";
+            case "雷" -> "震雷";
+            case "水", "净" -> "坎水";
+            case "护" -> "艮山";
+            case "斩" -> "兑金";
+            case "镇", "封" -> "坤土";
+            case "退", "引" -> "巽风";
+            case "明" -> "乾光";
+            case "吸" -> "噬灵";
+            case "魄" -> "归魂";
+            default -> "符咒";
+        };
     }
 
     private static void useInscription(ServerPlayer player, String slot1, String slot2, String slot3, BlockPos blockPos) {
@@ -273,8 +326,9 @@ public final class TalismanUseHandler {
             if (needsTarget && !chuan) {
                 primary = SkillCast.targetLiving(player);
                 if (primary == null) {
-                    notice(player, "组合符 · 未命中");
-                    dropStackAt(player, player.getMainHandItem().copyWithCount(1), SkillCast.landPoint(player));
+                    Vec3 missPoint = SkillCast.landPoint(player);
+                    miss(player, "组合符 · 未着", missPoint);
+                    dropStackAt(player, player.getMainHandItem().copyWithCount(1), missPoint);
                     consumeOne(player);
                     return;
                 }
@@ -294,8 +348,9 @@ public final class TalismanUseHandler {
                     int maxHits = overallM >= 1.0f ? 3 : (overallM >= 0.8f ? 2 : 1);
                     int hits = castPiercingLinkedCombo(player, spec, comboEnv, maxHits);
                     if (hits == 0) {
-                        notice(player, spec.label() + " · 未命中");
-                        dropStackAt(player, player.getMainHandItem().copyWithCount(1), SkillCast.landPoint(player));
+                        Vec3 missPoint = SkillCast.landPoint(player);
+                        miss(player, spec.label() + " · 未着", missPoint);
+                        dropStackAt(player, player.getMainHandItem().copyWithCount(1), missPoint);
                         consumeOne(player);
                         return;
                     }
@@ -383,8 +438,9 @@ public final class TalismanUseHandler {
             int maxHits = overallM >= 1.0f ? 3 : (overallM >= 0.8f ? 2 : 1);
             int hits = castPiercing(player, skill, env, maxHits);
             if (hits == 0) {
-                notice(player, skill + "符 · 未命中");
-                dropStackAt(player, player.getMainHandItem().copyWithCount(1), SkillCast.landPoint(player));
+                Vec3 missPoint = SkillCast.landPoint(player);
+                miss(player, skill + "符 · 未着", missPoint);
+                dropStackAt(player, player.getMainHandItem().copyWithCount(1), missPoint);
                 consumeOne(player);
                 return;
             }
@@ -412,8 +468,9 @@ public final class TalismanUseHandler {
         if (guang && SkillCast.hasTargetEffect(skill)) {
             LivingEntity primary = SkillCast.targetLiving(player);
             if (primary == null) {
-                notice(player, skill + "符 · 未命中");
-                dropStackAt(player, player.getMainHandItem().copyWithCount(1), SkillCast.landPoint(player));
+                Vec3 missPoint = SkillCast.landPoint(player);
+                miss(player, skill + "符 · 未着", missPoint);
+                dropStackAt(player, player.getMainHandItem().copyWithCount(1), missPoint);
                 consumeOne(player);
                 return;
             }
@@ -433,8 +490,9 @@ public final class TalismanUseHandler {
 
         SkillCast.Outcome outcome = SkillCast.cast(player, skill, env);
         if (outcome == SkillCast.Outcome.MISS) {
-            notice(player, skill + "符 · 未命中");
-            dropStackAt(player, player.getMainHandItem().copyWithCount(1), SkillCast.landPoint(player));
+            Vec3 missPoint = SkillCast.landPoint(player);
+            miss(player, skill + "符 · 未着", missPoint);
+            dropStackAt(player, player.getMainHandItem().copyWithCount(1), missPoint);
             consumeOne(player);
             return;
         }
@@ -612,6 +670,30 @@ public final class TalismanUseHandler {
         ItemEntity entity = new ItemEntity(player.serverLevel(), point.x, point.y, point.z, stack);
         entity.setDefaultPickUpDelay();
         player.serverLevel().addFreshEntity(entity);
+    }
+
+    private static void miss(ServerPlayer player, String text, Vec3 point) {
+        notice(player, text);
+        spawnMissFeedback(player.serverLevel(), point);
+    }
+
+    static void spawnMissFeedback(ServerLevel level, Vec3 point) {
+        RandomSource random = level.random;
+        for (int i = 0; i < 6; i++) {
+            double x = point.x + (random.nextDouble() - 0.5) * 0.28;
+            double y = point.y + random.nextDouble() * 0.18;
+            double z = point.z + (random.nextDouble() - 0.5) * 0.28;
+            level.sendParticles(ParticleTypes.SMOKE, x, y, z, 1,
+                (random.nextDouble() - 0.5) * 0.015, 0.012, (random.nextDouble() - 0.5) * 0.015, 0.0);
+        }
+        for (int i = 0; i < 3; i++) {
+            double x = point.x + (random.nextDouble() - 0.5) * 0.22;
+            double y = point.y + random.nextDouble() * 0.14;
+            double z = point.z + (random.nextDouble() - 0.5) * 0.22;
+            level.sendParticles(MISS_CINNABAR_PARTICLE, x, y, z, 1,
+                (random.nextDouble() - 0.5) * 0.01, 0.006, (random.nextDouble() - 0.5) * 0.01, 0.0);
+        }
+        level.playSound(null, BlockPos.containing(point), SoundEvents.BRUSH_SAND, SoundSource.PLAYERS, 0.28f, 0.65f);
     }
 
     private static void consumeOne(ServerPlayer player) {

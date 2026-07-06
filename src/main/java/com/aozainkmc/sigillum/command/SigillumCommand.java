@@ -1,8 +1,8 @@
 package com.aozainkmc.sigillum.command;
 
 import com.aozainkmc.sigillum.binding.GlyphBinding;
-import com.aozainkmc.sigillum.client.SigillumClientHooks;
 import com.aozainkmc.sigillum.dev.SigillumDevMode;
+import com.aozainkmc.sigillum.network.SigillumNetworking;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
@@ -12,8 +12,6 @@ import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.fml.loading.FMLEnvironment;
 
 public final class SigillumCommand {
     private SigillumCommand() {}
@@ -84,10 +82,11 @@ public final class SigillumCommand {
     }
 
     private static int openMenu(CommandContext<CommandSourceStack> ctx) {
-        if (FMLEnvironment.dist == Dist.CLIENT) {
-            SigillumClientHooks.openMenu();
-        } else {
-            ctx.getSource().sendFailure(Component.literal("[Sigillum] 菜单仅客户端可用"));
+        try {
+            ServerPlayer player = ctx.getSource().getPlayerOrException();
+            SigillumNetworking.sendMenu(player);
+        } catch (CommandSyntaxException e) {
+            ctx.getSource().sendFailure(Component.literal("[Sigillum] 该命令只能由玩家执行"));
         }
         return 1;
     }

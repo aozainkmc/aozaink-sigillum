@@ -6,6 +6,9 @@ import java.util.List;
 import java.util.Map;
 
 public final class GlyphCodex {
+    private static final List<String> BASIC_GLYPHS = List.of(
+        "镇", "封", "退", "引", "火", "雷", "护", "净", "斩", "明", "吸", "魄"
+    );
     private static final Map<String, String> BRIEF = new LinkedHashMap<>();
     private static final Map<String, String> DETAIL = new LinkedHashMap<>();
 
@@ -53,6 +56,10 @@ public final class GlyphCodex {
 
     public static List<String> glyphs() {
         return List.copyOf(BRIEF.keySet());
+    }
+
+    public static List<String> basicGlyphs() {
+        return BASIC_GLYPHS;
     }
 
     public static Map<String, String> all() {

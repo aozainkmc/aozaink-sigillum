@@ -36,13 +36,22 @@ public final class SigillumEffectTicker {
     }
 
     public static void scheduleBurn(ServerLevel level, LivingEntity target, float dmgPerSecond, int seconds) {
+        scheduleBurn(level, target, null, dmgPerSecond, seconds);
+    }
+
+    public static void scheduleBurn(ServerLevel level, LivingEntity target, ServerPlayer ownerPlayer, float dmgPerSecond, int seconds) {
         int[] remaining = {seconds};
         int[] ticks = {0};
         add(() -> {
             if (!target.isAlive() || target.level() != level) return true;
             ticks[0]++;
             if (ticks[0] % 20 == 0) {
-                target.hurt(level.damageSources().onFire(), dmgPerSecond);
+                if (ownerPlayer != null) {
+                    target.setLastHurtByPlayer(ownerPlayer);
+                }
+                target.hurt(ownerPlayer == null
+                    ? level.damageSources().onFire()
+                    : level.damageSources().indirectMagic(ownerPlayer, ownerPlayer), dmgPerSecond);
                 level.sendParticles(ParticleTypes.FLAME,
                     target.getX(), target.getY() + target.getBbHeight() * 0.6, target.getZ(),
                     8, 0.2, 0.3, 0.2, 0.01);

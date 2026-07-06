@@ -5,10 +5,12 @@ import com.aozainkmc.sigillum.advancement.SigillumCriterionTrigger;
 import com.aozainkmc.sigillum.event.SoulRecallHandler;
 import com.aozainkmc.sigillum.network.InscriptionStatusPayload;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -55,6 +57,8 @@ public final class SigillumInscriptionManager {
 
     public record ActivationResult(boolean consume, String message) {}
 
+    public record MenuInscription(String dimension, BlockPos pos, String name, float progress, double radius, boolean strong) {}
+
     public static ActivationResult activate(ServerPlayer player, BlockPos pos, List<String> skills,
             List<String> modifiers, float multiplier) {
         if (pos == null) {
@@ -94,11 +98,32 @@ public final class SigillumInscriptionManager {
             multiplier, radius, initialTicks, initialEnergy, initialTicks, initialEnergy, energyFactor, strong);
         data.entries.put(pos.asLong(), entry);
         data.setDirty();
-        return new ActivationResult(true, "刻印 · " + entry.name() + " · " + initialTicks + "tick");
+        return new ActivationResult(true, "刻印 · " + entry.name() + " · 持续约" + formatDuration(initialTicks));
     }
 
     public static boolean hasInscription(ServerLevel level, BlockPos pos) {
         return data(level).entries.containsKey(pos.asLong());
+    }
+
+    public static List<MenuInscription> ownedInscriptions(MinecraftServer server, UUID owner, int limit) {
+        if (server == null || owner == null || limit <= 0) {
+            return List.of();
+        }
+        List<MenuInscription> result = new ArrayList<>();
+        for (ServerLevel level : server.getAllLevels()) {
+            String dimension = level.dimension().location().toString();
+            for (Entry entry : data(level).entries.values()) {
+                if (!owner.equals(entry.owner)) {
+                    continue;
+                }
+                result.add(new MenuInscription(dimension, entry.pos, entry.name(), entry.progress(), entry.radius, entry.strong));
+            }
+        }
+        result.sort(Comparator.comparing(MenuInscription::dimension).thenComparingLong(entry -> entry.pos().asLong()));
+        if (result.size() > limit) {
+            return List.copyOf(result.subList(0, limit));
+        }
+        return List.copyOf(result);
     }
 
     public static void tick(MinecraftServer server) {
@@ -129,7 +154,7 @@ public final class SigillumInscriptionManager {
             existing.visualMaxTicks = Math.max(existing.visualMaxTicks, existing.remainingTicks);
             existing.visualMaxEnergy = Math.max(existing.visualMaxEnergy, existing.energy);
             data.setDirty();
-            return new ActivationResult(true, "刻印续时 · " + existing.remainingTicks + "tick");
+            return new ActivationResult(true, "刻印续时 · 剩余约" + formatDuration(existing.remainingTicks));
         }
         if ("强".equals(modifier)) {
             if (existing.strong) {
@@ -150,9 +175,25 @@ public final class SigillumInscriptionManager {
             }
             existing.radius = nextRadius;
             data.setDirty();
-            return new ActivationResult(true, "刻印广域 · 半径" + String.format("%.1f", existing.radius));
+            return new ActivationResult(true, "刻印广域 · 半径" + formatRadius(existing.radius));
         }
         return new ActivationResult(true, "废符");
+    }
+
+    private static String formatDuration(int ticks) {
+        int seconds = Math.max(1, Math.round(ticks / 20.0f));
+        if (seconds < 60) {
+            return seconds + "秒";
+        }
+        int minutes = Math.max(1, Math.round(seconds / 60.0f));
+        return minutes + "分钟";
+    }
+
+    private static String formatRadius(double radius) {
+        if (Math.abs(radius - Math.rint(radius)) < 0.001) {
+            return (int)Math.rint(radius) + "格";
+        }
+        return String.format(Locale.ROOT, "%.1f格", radius);
     }
 
     private static Data data(ServerLevel level) {
@@ -367,10 +408,10 @@ public final class SigillumInscriptionManager {
                 case "封" -> seal(entity, power);
                 case "退" -> repel(entity, center, power);
                 case "引" -> lure(entity, center, power);
-                case "火" -> burn(level, entity, power);
+                case "火" -> burn(level, ownerPlayer, entity, power);
                 case "雷" -> thunder(level, ownerPlayer, entity, power);
                 case "护" -> ward(level, ownerPlayer, entity, center, power);
-                case "净" -> purify(level, entity, power);
+                case "净" -> purify(level, ownerPlayer, entity, power);
                 case "斩" -> slash(level, ownerPlayer, entity, power);
                 case "明" -> reveal(entity, power);
                 case "吸" -> drain(level, ownerPlayer, entity, power);
@@ -440,10 +481,10 @@ public final class SigillumInscriptionManager {
             return true;
         }
 
-        private boolean burn(ServerLevel level, LivingEntity target, float power) {
+        private boolean burn(ServerLevel level, ServerPlayer ownerPlayer, LivingEntity target, float power) {
             boolean undead = target.getType().is(EntityTypeTags.UNDEAD);
             float dps = (undead ? 3.0f : 2.0f) * power;
-            SigillumEffectTicker.scheduleBurn(level, target, dps, 4);
+            SigillumEffectTicker.scheduleBurn(level, target, ownerPlayer, dps, 4);
             level.sendParticles(ParticleTypes.FLAME, target.getX(), target.getY() + target.getBbHeight() * 0.5,
                 target.getZ(), 10, 0.2, 0.3, 0.2, 0.01);
             return true;
@@ -468,7 +509,7 @@ public final class SigillumInscriptionManager {
                 if (delay[0]-- > 0) return false;
                 if (!target.isAlive() || target.level() != level) return true;
                 target.invulnerableTime = 0;
-                target.hurt(level.damageSources().lightningBolt(), damage);
+                hurtWithOwner(level, ownerPlayer, target, damage);
                 return true;
             });
             return true;
@@ -481,7 +522,7 @@ public final class SigillumInscriptionManager {
             }
             if (!(entity instanceof Enemy)) return false;
             entity.invulnerableTime = 0;
-            entity.hurt(level.damageSources().magic(), wardDamage(entity, center, power));
+            hurtWithOwner(level, ownerPlayer, entity, wardDamage(entity, center, power));
             drawWardRipple(level, center, entity);
             return true;
         }
@@ -569,7 +610,7 @@ public final class SigillumInscriptionManager {
             }
         }
 
-        private boolean purify(ServerLevel level, LivingEntity entity, float power) {
+        private boolean purify(ServerLevel level, ServerPlayer ownerPlayer, LivingEntity entity, float power) {
             boolean applied = false;
             if (entity instanceof ServerPlayer player) {
                 int cleanse = power >= 1.0f ? 3 : (power >= 0.8f ? 2 : 1);
@@ -583,7 +624,7 @@ public final class SigillumInscriptionManager {
             }
             if (entity.getType().is(EntityTypeTags.UNDEAD)) {
                 entity.invulnerableTime = 0;
-                entity.hurt(level.damageSources().magic(), 4.0f * power);
+                hurtWithOwner(level, ownerPlayer, entity, 4.0f * power);
                 applied = true;
             }
             return applied;
@@ -597,6 +638,7 @@ public final class SigillumInscriptionManager {
             target.invulnerableTime = 0;
             float lethalDamage = Math.max(target.getHealth(), target.getMaxHealth()) + 1024.0f;
             if (ownerPlayer != null) {
+                target.setLastHurtByPlayer(ownerPlayer);
                 target.hurt(level.damageSources().playerAttack(ownerPlayer), lethalDamage);
             } else {
                 target.hurt(level.damageSources().magic(), lethalDamage);
@@ -605,7 +647,7 @@ public final class SigillumInscriptionManager {
         }
 
         private boolean reveal(LivingEntity entity, float power) {
-            int ticks = Math.round(200 * Math.max(1.0f, power));
+            int ticks = Math.round(600 * Math.max(1.0f, power));
             if (entity instanceof ServerPlayer player) {
                 player.addEffect(new MobEffectInstance(MobEffects.NIGHT_VISION, ticks, 0));
                 return true;
@@ -622,11 +664,20 @@ public final class SigillumInscriptionManager {
             float hearts = power >= 1.0f ? 1.5f : (power >= 0.8f ? 1.0f : 0.5f);
             float amount = hearts * 2.0f * Math.max(1.0f, power);
             target.invulnerableTime = 0;
-            target.hurt(level.damageSources().magic(), amount);
+            hurtWithOwner(level, ownerPlayer, target, amount);
             if (ownerPlayer != null && ownerPlayer.isAlive()) {
                 ownerPlayer.heal(amount);
             }
             return true;
+        }
+
+        private void hurtWithOwner(ServerLevel level, ServerPlayer ownerPlayer, LivingEntity target, float amount) {
+            if (ownerPlayer != null) {
+                target.setLastHurtByPlayer(ownerPlayer);
+                target.hurt(level.damageSources().indirectMagic(ownerPlayer, ownerPlayer), amount);
+            } else {
+                target.hurt(level.damageSources().magic(), amount);
+            }
         }
 
         private boolean soulRecall(ServerPlayer ownerPlayer, LivingEntity entity, float power) {

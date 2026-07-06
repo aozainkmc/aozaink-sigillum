@@ -1,0 +1,15 @@
+{
+  "providers": [
+    {
+      "type": "ttf",
+      "file": "aozaink_sigillum:lxgw_wenkai_lite_regular.ttf",
+      "size": 10.0,
+      "oversample": 1.0,
+      "shift": [0.0, 0.0]
+    },
+    {
+      "type": "reference",
+      "id": "minecraft:default"
+    }
+  ]
+}
