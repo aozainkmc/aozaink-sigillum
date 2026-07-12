@@ -1,6 +1,7 @@
 package com.aozainkmc.sigillum.command;
 
-import com.aozainkmc.sigillum.binding.GlyphBinding;
+import com.aozainkmc.input.binding.QuickGlyphBinding;
+import com.aozainkmc.input.network.AozaiInkNetworking;
 import com.aozainkmc.sigillum.dev.SigillumDevMode;
 import com.aozainkmc.sigillum.network.SigillumNetworking;
 import com.mojang.brigadier.CommandDispatcher;
@@ -37,12 +38,12 @@ public final class SigillumCommand {
                                 int slot = IntegerArgumentType.getInteger(ctx, "slot");
                                 String glyph = StringArgumentType.getString(ctx, "glyph");
                                 ServerPlayer player = ctx.getSource().getPlayerOrException();
-                                String chinese = GlyphBinding.toChineseDigit(slot);
+                                String chinese = QuickGlyphBinding.toChineseDigit(slot);
                                 if (chinese.isEmpty()) {
                                     ctx.getSource().sendFailure(Component.literal("无效数字"));
                                     return 0;
                                 }
-                                GlyphBinding.bind(player, chinese, glyph);
+                                QuickGlyphBinding.bind(player, chinese, glyph);
                                 ctx.getSource().sendSuccess(() ->
                                     Component.literal("[Sigillum] 已绑定 " + chinese + " -> " + glyph), false);
                                 return 1;
@@ -54,8 +55,8 @@ public final class SigillumCommand {
                             if (!requireDevMode(ctx)) return 0;
                             int slot = IntegerArgumentType.getInteger(ctx, "slot");
                             ServerPlayer player = ctx.getSource().getPlayerOrException();
-                            String chinese = GlyphBinding.toChineseDigit(slot);
-                            GlyphBinding.bind(player, chinese, "");
+                            String chinese = QuickGlyphBinding.toChineseDigit(slot);
+                            QuickGlyphBinding.bind(player, chinese, "");
                             ctx.getSource().sendSuccess(() ->
                                 Component.literal("[Sigillum] 已解除绑定 " + chinese), false);
                             return 1;
@@ -68,9 +69,9 @@ public final class SigillumCommand {
                         StringBuilder builder = new StringBuilder("[Sigillum] 绑定列表:");
                         for (int i = 1; i <= 9; i++) {
                             final int slot = i;
-                            String chinese = GlyphBinding.toChineseDigit(slot);
-                            GlyphBinding.getBoundGlyph(player, chinese).ifPresent(glyph ->
-                                builder.append(" ").append(chinese).append("->").append(glyph));
+                            String chinese = QuickGlyphBinding.toChineseDigit(slot);
+                            QuickGlyphBinding.get(player, chinese).ifPresent(binding ->
+                                builder.append(" ").append(chinese).append("->").append(binding.glyph()));
                         }
                         String msg = builder.toString();
                         ctx.getSource().sendSuccess(() -> Component.literal(msg), false);
@@ -84,7 +85,7 @@ public final class SigillumCommand {
     private static int openMenu(CommandContext<CommandSourceStack> ctx) {
         try {
             ServerPlayer player = ctx.getSource().getPlayerOrException();
-            SigillumNetworking.sendMenu(player);
+            AozaiInkNetworking.sendMenu(player);
         } catch (CommandSyntaxException e) {
             ctx.getSource().sendFailure(Component.literal("[Sigillum] 该命令只能由玩家执行"));
         }

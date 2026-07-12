@@ -1,6 +1,7 @@
 package com.aozainkmc.sigillum.client;
 
 import com.aozainkmc.sigillum.network.InscriptionStatusPayload;
+import com.aozainkmc.sigillum.network.InscriptionRevealPayload;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.blaze3d.vertex.BufferUploader;
@@ -35,6 +36,7 @@ public final class SigillumInscriptionOverlay {
     private static final int BARRIER_RINGS = 7;
     private static final int SIGIL_SEGMENTS = 48;
     private static final Map<Long, Entry> ENTRIES = new HashMap<>();
+    private static final Map<Long, Reveal> REVEALS = new HashMap<>();
 
     private SigillumInscriptionOverlay() {}
 
@@ -47,10 +49,19 @@ public final class SigillumInscriptionOverlay {
         }
     }
 
+    public static void beginReveal(InscriptionRevealPayload payload) {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft.level == null) return;
+        REVEALS.put(payload.pos().asLong(), new Reveal(
+            payload.startRadius(), payload.radius(), payload.ward(), minecraft.level.getGameTime(),
+            InscriptionRevealPayload.durationTicks(payload.radius() - payload.startRadius())
+        ));
+    }
+
     public static void render(RenderLevelStageEvent event) {
         if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_WEATHER) return;
         Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft.level == null || minecraft.player == null || ENTRIES.isEmpty()) return;
+        if (minecraft.level == null || minecraft.player == null || (ENTRIES.isEmpty() && REVEALS.isEmpty())) return;
 
         long now = minecraft.level.getGameTime();
         Vec3 cameraPos = event.getCamera().getPosition();
@@ -63,7 +74,12 @@ public final class SigillumInscriptionOverlay {
                 iterator.remove();
             }
         }
-        if (ENTRIES.isEmpty()) return;
+        Iterator<Map.Entry<Long, Reveal>> revealIterator = REVEALS.entrySet().iterator();
+        while (revealIterator.hasNext()) {
+            Map.Entry<Long, Reveal> mapEntry = revealIterator.next();
+            if (now - mapEntry.getValue().startTick >= mapEntry.getValue().durationTicks) revealIterator.remove();
+        }
+        if (ENTRIES.isEmpty() && REVEALS.isEmpty()) return;
 
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
@@ -82,9 +98,22 @@ public final class SigillumInscriptionOverlay {
         Vec3 right = new Vec3(-leftVector.x(), -leftVector.y(), -leftVector.z());
         Vec3 up = new Vec3(upVector.x(), upVector.y(), upVector.z());
 
+        for (Map.Entry<Long, Reveal> mapEntry : REVEALS.entrySet()) {
+            BlockPos pos = BlockPos.of(mapEntry.getKey());
+            Reveal reveal = mapEntry.getValue();
+            if (reveal.ward) {
+                renderWardReveal(builder, matrix, Vec3.atCenterOf(pos).subtract(cameraPos), right, up,
+                    reveal, now, event.getPartialTick().getGameTimeDeltaPartialTick(false));
+            } else {
+                renderReveal(builder, matrix, minecraft.level, Vec3.atCenterOf(pos), cameraPos,
+                    reveal, now, event.getPartialTick().getGameTimeDeltaPartialTick(false));
+            }
+        }
+
         for (Map.Entry<Long, Entry> mapEntry : ENTRIES.entrySet()) {
             BlockPos pos = BlockPos.of(mapEntry.getKey());
             Entry entry = mapEntry.getValue();
+            if (REVEALS.containsKey(mapEntry.getKey())) continue;
             Vec3 anchor = Vec3.atCenterOf(pos);
             if (entry.ward()) {
                 Vec3 center = anchor.subtract(cameraPos);
@@ -127,6 +156,40 @@ public final class SigillumInscriptionOverlay {
             groundQuad(builder, matrix, level, anchor, cameraPos,
                 polar(anchor, innerRadius, a0), polar(anchor, radius, a0), polar(anchor, radius, a1), polar(anchor, innerRadius, a1), edgeColor);
         }
+    }
+
+    private static void renderReveal(BufferBuilder builder, Matrix4f matrix, Level level, Vec3 anchor,
+            Vec3 cameraPos, Reveal reveal, long now, float partialTick) {
+        float progress = Math.max(0.0F, Math.min(1.0F,
+            (now - reveal.startTick + partialTick) / reveal.durationTicks));
+        float eased = 1.0F - (1.0F - progress) * (1.0F - progress) * (1.0F - progress);
+        double front = Math.max(0.08D, reveal.startRadius + (reveal.radius - reveal.startRadius) * eased);
+        double trail = Math.max(0.8D, (reveal.radius - reveal.startRadius) * 0.32D);
+        int bands = 7;
+        for (int band = 0; band < bands; band++) {
+            double outer = Math.max(0.05D, front - trail * band / bands);
+            double inner = Math.max(0.01D, front - trail * (band + 1) / bands);
+            float strength = 1.0F - band / (float) bands;
+            int alpha = Math.round(150.0F * strength * (0.55F + 0.45F * (1.0F - progress)));
+            int color = (alpha << 24) | 0x002A0504;
+            for (int i = 0; i < SIGIL_SEGMENTS; i++) {
+                double a0 = Math.PI * 2.0D * i / SIGIL_SEGMENTS;
+                double a1 = Math.PI * 2.0D * (i + 1) / SIGIL_SEGMENTS;
+                groundQuad(builder, matrix, level, anchor, cameraPos,
+                    polar(anchor, inner, a0), polar(anchor, outer, a0),
+                    polar(anchor, outer, a1), polar(anchor, inner, a1), color);
+            }
+        }
+    }
+
+    private static void renderWardReveal(BufferBuilder builder, Matrix4f matrix, Vec3 center,
+            Vec3 cameraRight, Vec3 cameraUp, Reveal reveal, long now, float partialTick) {
+        float progress = Math.max(0.0F, Math.min(1.0F,
+            (now - reveal.startTick + partialTick) / reveal.durationTicks));
+        float eased = 1.0F - (1.0F - progress) * (1.0F - progress) * (1.0F - progress);
+        float radius = Math.max(0.18F, reveal.startRadius + (reveal.radius - reveal.startRadius) * eased);
+        renderWardBarrier(builder, matrix, center, cameraRight, cameraUp,
+            new Entry(1.0F, radius, InscriptionStatusPayload.Entry.STYLE_WARD, Long.MAX_VALUE));
     }
 
     private static Vec3 lockTarget(Minecraft minecraft, Vec3 anchor, Entry entry) {
@@ -211,7 +274,7 @@ public final class SigillumInscriptionOverlay {
 
     private static void renderWardBarrier(BufferBuilder builder, Matrix4f matrix, Vec3 anchor,
             Vec3 cameraRight, Vec3 cameraUp, Entry entry) {
-        double radius = Math.max(2.5, entry.radius);
+        double radius = Math.max(0.18, entry.radius);
         Vec3 center = anchor;
         Vec3 top = center.add(0.0, radius, 0.0);
         Vec3 bottom = center.add(0.0, -radius, 0.0);
@@ -365,4 +428,6 @@ public final class SigillumInscriptionOverlay {
             return style == InscriptionStatusPayload.Entry.STYLE_WARD;
         }
     }
+
+    private record Reveal(float startRadius, float radius, boolean ward, long startTick, int durationTicks) {}
 }

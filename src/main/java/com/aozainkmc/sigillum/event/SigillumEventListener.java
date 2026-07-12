@@ -2,7 +2,6 @@ package com.aozainkmc.sigillum.event;
 
 import com.aozainkmc.sigillum.advancement.SigillumAdvancementTriggers;
 import com.aozainkmc.sigillum.SigillumMod;
-import com.aozainkmc.sigillum.binding.GlyphBinding;
 import com.aozainkmc.sigillum.cast.SkillCast;
 import com.aozainkmc.sigillum.dev.SigillumDevMode;
 import com.aozainkmc.sigillum.glyph.GlyphSemantics;
@@ -10,12 +9,12 @@ import com.aozainkmc.core.api.InkRecognitionResult;
 import com.aozainkmc.core.api.InkRecognizedEvent;
 import com.aozainkmc.core.api.InkSource;
 import java.util.List;
-import java.util.Optional;
 import com.aozainkmc.sigillum.util.SigillumTexts;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import com.aozainkmc.input.api.QuickBindingChangedEvent;
 
 @EventBusSubscriber(modid = SigillumMod.MOD_ID)
 public final class SigillumEventListener {
@@ -60,6 +59,13 @@ public final class SigillumEventListener {
         event.player().displayClientMessage(Component.literal(builder.toString()), false);
     }
 
+    @SubscribeEvent
+    public static void onQuickBindingChanged(QuickBindingChangedEvent event) {
+        if (SigillumMod.MOD_ID.equals(event.binding().owner())) {
+            SigillumAdvancementTriggers.specifiedBound(event.player(), event.binding().glyph());
+        }
+    }
+
     private static void onTalismanRecognized(InkRecognizedEvent event, String type) {
         if (!SigillumDevMode.isEnabled(event.player())) {
             return;
@@ -87,22 +93,12 @@ public final class SigillumEventListener {
     private static void onPaperCasting(InkRecognizedEvent event) {
         InkRecognitionResult result = event.result();
         InkSource source = event.source();
-        String word = normalizePaperDigit(result);
-
-        if (!GlyphBinding.isChineseDigit(word)) {
-            event.setCanceled(true);
-            SigillumTexts.actionbar(event.player(), "白纸指定技只接受一至九", SigillumTexts.CINNABAR);
+        String owner = String.valueOf(source.extra().getOrDefault("quick_owner", ""));
+        if (!SigillumMod.MOD_ID.equals(owner)) {
             return;
         }
-
-        Optional<String> bound = GlyphBinding.getBoundGlyph(event.player(), word);
-        if (bound.isEmpty()) {
-            event.setCanceled(true);
-            SigillumTexts.actionbar(event.player(), "数字 " + word + " 未指定", SigillumTexts.CINNABAR);
-            return;
-        }
-
-        String glyph = bound.get();
+        String display = String.valueOf(source.extra().getOrDefault("quick_display", result.topGlyph()));
+        String glyph = result.topGlyph();
         if (!(event.player() instanceof ServerPlayer serverPlayer)) {
             event.setCanceled(true);
             return;
@@ -120,7 +116,7 @@ public final class SigillumEventListener {
             SigillumTexts.actionbar(event.player(),
                 Component.empty()
                     .append(SigillumTexts.colored("快速吟唱：", SigillumTexts.GOLD))
-                    .append(SigillumTexts.colored(word + " → " + glyph, SigillumTexts.GOLD))
+                    .append(SigillumTexts.colored(display, SigillumTexts.GOLD))
                     .append(SigillumTexts.colored(" · 未着", SigillumTexts.CINNABAR)));
             return;
         }
@@ -128,22 +124,8 @@ public final class SigillumEventListener {
         SigillumTexts.actionbar(event.player(),
             Component.empty()
                 .append(SigillumTexts.colored("快速吟唱：", SigillumTexts.GOLD))
-                .append(SigillumTexts.colored(word + " → " + glyph, SigillumTexts.GOLD))
+                .append(SigillumTexts.colored(display, SigillumTexts.GOLD))
                 .append(SigillumTexts.colored(" | 倍率: " + source.powerMultiplier(), SigillumTexts.CREAM)));
     }
 
-    private static String normalizePaperDigit(InkRecognitionResult result) {
-        String word = result.topGlyph() == null ? "" : result.topGlyph().trim();
-        int strokes = result.simplifiedStrokeCount();
-        if (strokes == 1) {
-            return "一";
-        }
-        if (strokes == 2 && (!GlyphBinding.isChineseDigit(word) || "三".equals(word))) {
-            return "二";
-        }
-        if (strokes == 3 && (!GlyphBinding.isChineseDigit(word) || "二".equals(word))) {
-            return "三";
-        }
-        return word;
-    }
 }

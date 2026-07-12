@@ -8,7 +8,6 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import org.lwjgl.glfw.GLFW;
 
-@EventBusSubscriber(modid = SigillumMod.MOD_ID, value = Dist.CLIENT)
 public final class SigillumKeyMappings {
 
     public static final KeyMapping OPEN_MENU = new KeyMapping(

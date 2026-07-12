@@ -1,5 +1,7 @@
 # aozaink-sigillum
 
+开发工程名为 `aozaink-sigillum`；面向玩家的发布产物名为 `molu-sigillum`，属于 Molu / 墨箓的符箓魔法玩法分类。
+
 官方样例符箓玩法模组。基于 Aozai Ink Core 的手写识别事件实现基础符箓玩法面，用于验证 `core + input + gameplay` 的端到端链路。
 
 拉丁语 *sigillum*：封印、符印。
@@ -8,11 +10,10 @@
 
 sigillum 已具备一条端到端可玩链路：
 
-- 向 core 注册字集，监听 `InkRecognizedEvent`，处理识别反馈与白纸快速吟唱。
+- 向 core 注册字集；向 Input 注册十二字说明和「刻印」菜单栏目；监听已由 Input 解析 owner 的快速吟唱事件。
 - 命令：`/sigillum dev/bind/unbind/list`（需 op + dev）；`/sigillum menu`（**任何玩家、无需权限**）打开菜单。
-- 自绘「符咒·设置」菜单（中华风纯色块）：**快速吟唱页**（看 1-9 绑定字 + 效果、可清除；改绑请写指定符，菜单内不写字）、**黄符字典页**（16 字含义）。命令或键位（默认 **M**，可在原版控制里改）打开。
-- 用 `GlyphBinding` 把中文数字 `一..九` 绑定常用字（写指定符）。
-- 读取黄符 `CustomData`：指定符（绑数字）、刻印符（服务端持久范围效果）、组合符。
+- 共享「墨箓」菜单、默认 M 键和指定符绑定位于 Input；Sigillum 只贡献自己的字典和刻印栏目。
+- 读取黄符 `CustomData`：刻印符（服务端持久范围效果）与组合符；指定符由 Input 消耗。
 - **品质等级**：读符上 `aozaink:grade<格>` → `TalismanGrade` → 效果倍率（极品 100% / 良品 80% / 劣质 55% / 废符 0%）。
 - **单字施法效果（v1：镇 / 封 / 退 / 引 / 火 / 雷 / 护 / 净 / 斩 / 明 / 吸 / 魄）**：`SkillCast` 出效果 + `SigillumEffectTicker`（服务端 tick 调度火 DoT 等持续效果）。不同技能读取的倍率通道不同，精确行为见 `IMPLEMENTATION.md`。视线 16 格命中、未命中落地可拾回；废符溃散。
 - **修饰字（v1：强 / 续 / 广 / 穿）**：强=效果倍率 `overallM×2.0`，续=持续倍率 `1+overallM`，广=范围化（普通目标技能半径4格，明为24格照妖），穿=穿透射线（极品3/良品2/劣质1 目标，命中后降档复用）。广和穿不能同时出现，同时出现判废符。
@@ -29,18 +30,18 @@ sigillum 已具备一条端到端可玩链路：
 - 监听 `InkRecognizedEvent`，按识别字 + `InkSource` 触发玩法。
 - 监听 input 的中性结果信号，并把它们解释为 sigillum 自己的成就条件。
 - 读黄符稳定 NBT/CustomData，解释指定符/刻印符/组合符，并把符上**品质等级换算成效果倍率**施放。
-- 管理 sigillum 自己的字→语义映射、快速吟唱绑定，以及客户端菜单/键位。
+- 管理 sigillum 自己的字→语义映射、实际施法与刻印；不再拥有通用绑定存档或共享菜单。
 
 ## 不负责
 
 - 识别推理（交给 core）。
 - 输入采集（交给 input 或用户自选输入模块）。
 - 定义其他模组的字的含义（每个玩法自己建 `GlyphSemantics`）。
-- 依赖 `aozaink-input` 的 Java 类。
+- 反向要求 Input 依赖 Sigillum。
 
 ## 依赖
 
-只依赖 `aozaink-core`。**不依赖 `aozaink-input`**。
+依赖 `aozaink-core` 与 `aozaink-input`。Core 仍是开放接口层；Input 是官方 Molu 的通用交互与菜单层。
 
 ```groovy
 dependencies {

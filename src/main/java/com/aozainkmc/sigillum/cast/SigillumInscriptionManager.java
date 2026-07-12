@@ -4,6 +4,7 @@ import com.aozainkmc.sigillum.advancement.SigillumAdvancementTriggers;
 import com.aozainkmc.sigillum.advancement.SigillumCriterionTrigger;
 import com.aozainkmc.sigillum.event.SoulRecallHandler;
 import com.aozainkmc.sigillum.network.InscriptionStatusPayload;
+import com.aozainkmc.sigillum.network.InscriptionRevealPayload;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -75,7 +76,12 @@ public final class SigillumInscriptionManager {
         Data data = data(level);
         Entry existing = data.entries.get(pos.asLong());
         if (skills.isEmpty()) {
-            return applyModifierOnly(data, existing, modifiers, multiplier);
+            double oldRadius = existing == null ? 0.0D : existing.radius;
+            ActivationResult result = applyModifierOnly(data, existing, modifiers, multiplier);
+            if (result.consume() && existing != null && existing.radius > oldRadius + 0.001D) {
+                broadcastReveal(level, player, existing, oldRadius);
+            }
+            return result;
         }
         String modifier = modifiers.isEmpty() ? "" : modifiers.get(0);
         if (existing != null) {
@@ -98,6 +104,7 @@ public final class SigillumInscriptionManager {
             multiplier, radius, initialTicks, initialEnergy, initialTicks, initialEnergy, energyFactor, strong);
         data.entries.put(pos.asLong(), entry);
         data.setDirty();
+        broadcastReveal(level, player, entry, 0.0D);
         return new ActivationResult(true, "刻印 · " + entry.name() + " · 持续约" + formatDuration(initialTicks));
     }
 
@@ -187,6 +194,19 @@ public final class SigillumInscriptionManager {
         }
         int minutes = Math.max(1, Math.round(seconds / 60.0f));
         return minutes + "分钟";
+    }
+
+    private static void broadcastReveal(ServerLevel level, ServerPlayer owner, Entry entry, double startRadius) {
+        InscriptionRevealPayload payload = new InscriptionRevealPayload(
+            entry.pos, owner.getUUID(), (float) startRadius, (float) entry.radius, entry.skills.contains("护")
+        );
+        double x = entry.pos.getX() + 0.5D;
+        double y = entry.pos.getY() + 0.5D;
+        double z = entry.pos.getZ() + 0.5D;
+        double rangeSqr = 96.0D * 96.0D;
+        for (ServerPlayer viewer : level.players()) {
+            if (viewer.distanceToSqr(x, y, z) <= rangeSqr) PacketDistributor.sendToPlayer(viewer, payload);
+        }
     }
 
     private static String formatRadius(double radius) {

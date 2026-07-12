@@ -72,7 +72,7 @@ public final class TalismanUseHandler {
         if (!tag.contains(TAG_TYPE)) return;
 
         String type = tag.getString(TAG_TYPE);
-        if ("inscription".equals(type)) return;
+        if ("inscription".equals(type) || "specified".equals(type)) return;
 
         event.setCanceled(true);
         dispatchUse(player, tag, null);
@@ -87,6 +87,7 @@ public final class TalismanUseHandler {
 
         CompoundTag tag = talismanTag(stack);
         if (!tag.contains(TAG_TYPE)) return;
+        if ("specified".equals(tag.getString(TAG_TYPE))) return;
         if (shouldLetBlockHandle(player, event.getPos())) return;
 
         event.setCanceled(true);
