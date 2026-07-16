@@ -1,7 +1,9 @@
 package com.aozainkmc.sigillum.cast;
 
 import com.aozainkmc.sigillum.SigillumMod;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.level.ServerLevel;
@@ -9,6 +11,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.LivingEntity;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.event.server.ServerStoppedEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 @EventBusSubscriber(modid = SigillumMod.MOD_ID)
@@ -23,16 +26,37 @@ public final class SigillumEffectTicker {
     private SigillumEffectTicker() {}
 
     public static void add(Task task) {
-        TASKS.add(task);
+        TASKS.add(Objects.requireNonNull(task, "task"));
     }
 
     @SubscribeEvent
     public static void onServerTick(ServerTickEvent.Post event) {
-        if (!TASKS.isEmpty()) {
-            TASKS.removeIf(Task::tick);
-        }
+        tickTasks();
         SigillumShieldManager.tick(event.getServer());
         SigillumInscriptionManager.tick(event.getServer());
+    }
+
+    /**
+     * Runs only the tasks that existed at the beginning of this server tick.
+     * Tasks scheduled by a callback start on the next tick instead of mutating
+     * the collection while it is being traversed.
+     */
+    static void tickTasks() {
+        for (Task task : new ArrayList<>(TASKS)) {
+            try {
+                if (task.tick()) {
+                    TASKS.remove(task);
+                }
+            } catch (RuntimeException exception) {
+                TASKS.remove(task);
+                SigillumMod.LOGGER.error("Discarding failed Sigillum effect task", exception);
+            }
+        }
+    }
+
+    @SubscribeEvent
+    public static void onServerStopped(ServerStoppedEvent event) {
+        TASKS.clear();
     }
 
     public static void scheduleBurn(ServerLevel level, LivingEntity target, float dmgPerSecond, int seconds) {

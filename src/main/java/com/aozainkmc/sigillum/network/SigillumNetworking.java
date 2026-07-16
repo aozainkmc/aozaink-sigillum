@@ -1,16 +1,6 @@
 package com.aozainkmc.sigillum.network;
 
 import com.aozainkmc.sigillum.SigillumMod;
-import com.aozainkmc.sigillum.client.SigillumShieldHud;
-import com.aozainkmc.sigillum.client.SigillumInscriptionOverlay;
-import com.aozainkmc.sigillum.client.SigillumInscriptionCamera;
-import net.minecraft.client.Minecraft;
-import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.phys.Vec3;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.fml.loading.FMLEnvironment;
-import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
@@ -27,23 +17,15 @@ public final class SigillumNetworking {
     }
 
     private static void handleShieldSync(ShieldSyncPayload payload, IPayloadContext context) {
-        if (FMLEnvironment.dist == Dist.CLIENT) {
-            SigillumShieldHud.update(payload.amount(), payload.max());
-        }
+        context.enqueueWork(() -> SigillumClientPayloadHandler.handleShieldSync(payload));
     }
 
     private static void handleInscriptionStatus(InscriptionStatusPayload payload, IPayloadContext context) {
-        if (FMLEnvironment.dist == Dist.CLIENT) {
-            SigillumInscriptionOverlay.update(payload.entries());
-        }
+        context.enqueueWork(() -> SigillumClientPayloadHandler.handleInscriptionStatus(payload));
     }
 
     private static void handleInscriptionReveal(InscriptionRevealPayload payload, IPayloadContext context) {
-        if (FMLEnvironment.dist != Dist.CLIENT) return;
-        Minecraft.getInstance().execute(() -> {
-            SigillumInscriptionOverlay.beginReveal(payload);
-            SigillumInscriptionCamera.begin(payload);
-        });
+        context.enqueueWork(() -> SigillumClientPayloadHandler.handleInscriptionReveal(payload));
     }
 
 }

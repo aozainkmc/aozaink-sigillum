@@ -1,10 +1,8 @@
 package com.aozainkmc.sigillum;
 
 import com.aozainkmc.core.AozaiInkCoreApi;
-import com.aozainkmc.core.api.GlyphDescriber;
 import com.aozainkmc.sigillum.advancement.SigillumAdvancementTriggers;
 import com.aozainkmc.sigillum.command.SigillumCommand;
-import com.aozainkmc.sigillum.glyph.GlyphEffectDescriber;
 import com.aozainkmc.sigillum.glyph.GlyphSemantics;
 import com.aozainkmc.sigillum.glyph.GlyphCodex;
 import com.aozainkmc.sigillum.cast.SigillumInscriptionManager;
@@ -16,7 +14,6 @@ import com.aozainkmc.sigillum.network.SigillumNetworking;
 import com.mojang.logging.LogUtils;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
-import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import org.slf4j.Logger;
@@ -31,7 +28,6 @@ public final class SigillumMod {
         registerMoluMenuContent();
         SigillumAdvancementTriggers.register(modBus);
         modBus.addListener(SigillumNetworking::registerPayloads);
-        modBus.addListener(this::onClientSetup);
         NeoForge.EVENT_BUS.addListener(this::registerCommands);
     }
 
@@ -56,11 +52,6 @@ public final class SigillumMod {
                 }
                 return rows;
             });
-    }
-
-    private void onClientSetup(FMLClientSetupEvent event) {
-        event.enqueueWork(() ->
-            AozaiInkCoreApi.registerService(GlyphDescriber.class, new GlyphEffectDescriber()));
     }
 
     private void registerCommands(RegisterCommandsEvent event) {
