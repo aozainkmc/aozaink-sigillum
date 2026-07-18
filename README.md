@@ -54,6 +54,8 @@ sigillum 通过稳定物品 ID `aozaink_input:yellow_talisman` 和 `CustomData` 
 
 ## 当前字表
 
+印契拥有六组母义：定（镇/封）、行（退/引）、化（火/雷）、济（护/净）、决（明/斩）、摄（吸/魄）。这些是 Sigillum 的字权，不是其他模块可复用的公共字表；完整规则见 [`../GLYPH_OWNERSHIP.md`](../GLYPH_OWNERSHIP.md)。
+
 | 字 | 标签 | 方向 |
 |----|------|------|
 | 镇 | `sigillum.suppress`, `sigillum.control` | 镇压、控制 |
@@ -69,7 +71,7 @@ sigillum 通过稳定物品 ID `aozaink_input:yellow_talisman` 和 `CustomData` 
 | 吸 | `sigillum.drain`, `sigillum.heal` | 吸血、汲取 |
 | 魄 | `sigillum.soul`, `sigillum.recall` | 招魄、召回 |
 
-修饰字：强（效果强化）、续（延时）、广（范围）、穿（穿透）。广与穿互斥，同时写在同一张普通符上判废符。
+印契尾修字：强（效果强化）、续（延时）、广（范围）、穿（穿透）。它们只属于 Sigillum；Input 统一第三格尾修格式，但未来模块必须拥有自己的尾修字。广与穿互斥，同时写在同一张普通符上判废符。
 
 ## 玩家联测路径
 
