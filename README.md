@@ -56,20 +56,20 @@ sigillum 通过稳定物品 ID `aozaink_input:yellow_talisman` 和 `CustomData` 
 
 印契拥有六组母义：定（镇/封）、行（退/引）、化（火/雷）、济（护/净）、决（明/斩）、摄（吸/魄）。这些是 Sigillum 的字权，不是其他模块可复用的公共字表；完整规则见 [`../GLYPH_OWNERSHIP.md`](../GLYPH_OWNERSHIP.md)。
 
-| 字 | 标签 | 方向 |
+|字|标签|方向|
 |----|------|------|
-| 镇 | `sigillum.suppress`, `sigillum.control` | 镇压、控制 |
-| 封 | `sigillum.seal`, `sigillum.ward` | 封印、防护 |
-| 退 | `sigillum.repel`, `sigillum.cleanse` | 驱退、清除 |
-| 引 | `sigillum.lure`, `sigillum.pull` | 引诱、牵引 |
-| 火 | `sigillum.fire`, `sigillum.element` | 燃烧、元素 |
-| 雷 | `sigillum.thunder`, `sigillum.element` | 雷击、元素 |
-| 护 | `sigillum.shield`, `sigillum.protect` | 护盾、守护 |
-| 净 | `sigillum.purify`, `sigillum.heal` | 净化、治疗 |
-| 斩 | `sigillum.execute`, `sigillum.attack` | 斩杀、处决 |
-| 明 | `sigillum.reveal`, `sigillum.light` | 显形、照明 |
-| 吸 | `sigillum.drain`, `sigillum.heal` | 吸血、汲取 |
-| 魄 | `sigillum.soul`, `sigillum.recall` | 招魄、召回 |
+|镇|`sigillum.suppress`, `sigillum.control`|镇压、控制|
+|封|`sigillum.seal`, `sigillum.ward`|封印、防护|
+|退|`sigillum.repel`, `sigillum.cleanse`|驱退、清除|
+|引|`sigillum.lure`, `sigillum.pull`|引诱、牵引|
+|火|`sigillum.fire`, `sigillum.element`|燃烧、元素|
+|雷|`sigillum.thunder`, `sigillum.element`|雷击、元素|
+|护|`sigillum.shield`, `sigillum.protect`|护盾、守护|
+|净|`sigillum.purify`, `sigillum.heal`|净化、治疗|
+|斩|`sigillum.execute`, `sigillum.attack`|斩杀、处决|
+|明|`sigillum.reveal`, `sigillum.light`|显形、照明|
+|吸|`sigillum.drain`, `sigillum.heal`|吸血、汲取|
+|魄|`sigillum.soul`, `sigillum.recall`|招魄、召回|
 
 印契尾修字：强（效果强化）、续（延时）、广（范围）、穿（穿透）。它们只属于 Sigillum；Input 统一第三格尾修格式，但未来模块必须拥有自己的尾修字。广与穿互斥，同时写在同一张普通符上判废符。
 
