@@ -1,4 +1,8 @@
 {
   "key.categories.aozaink_sigillum": "符咒",
-  "key.aozaink_sigillum.open_menu": "打开符咒菜单"
+  "key.aozaink_sigillum.open_menu": "打开符咒菜单",
+  "tutorial.aozaink_sigillum.open_menu.title": "符法入门",
+  "tutorial.aozaink_sigillum.open_menu.description": "按 %s 打开符咒簿",
+  "tutorial.aozaink_sigillum.place_talisman.title": "放置黄符",
+  "tutorial.aozaink_sigillum.place_talisman.description": "按住 %s，并对工作台按 %s"
 }

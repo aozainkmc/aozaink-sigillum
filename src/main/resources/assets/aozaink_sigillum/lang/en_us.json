@@ -1,4 +1,8 @@
 {
   "key.categories.aozaink_sigillum": "Sigillum",
-  "key.aozaink_sigillum.open_menu": "Open Sigillum Menu"
+  "key.aozaink_sigillum.open_menu": "Open Sigillum Menu",
+  "tutorial.aozaink_sigillum.open_menu.title": "Sigillum Guide",
+  "tutorial.aozaink_sigillum.open_menu.description": "Press %s to open the Sigillum book",
+  "tutorial.aozaink_sigillum.place_talisman.title": "Place Yellow Talisman",
+  "tutorial.aozaink_sigillum.place_talisman.description": "Hold %s and press %s on a crafting table"
 }

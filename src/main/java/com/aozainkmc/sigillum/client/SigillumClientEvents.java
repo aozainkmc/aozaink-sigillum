@@ -1,6 +1,7 @@
 package com.aozainkmc.sigillum.client;
 
 import com.aozainkmc.sigillum.SigillumMod;
+import com.aozainkmc.sigillum.client.tutorial.SigillumTutorialClient;
 import net.minecraft.client.Minecraft;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -19,12 +20,14 @@ public final class SigillumClientEvents {
     public static void onClientTick(ClientTickEvent.Post event) {
         Minecraft mc = Minecraft.getInstance();
         SigillumInscriptionCamera.tick(mc);
+        SigillumTutorialClient.tick(mc);
         if (mc.player == null) return;
     }
 
     @SubscribeEvent
     public static void onLogout(ClientPlayerNetworkEvent.LoggingOut event) {
         SigillumInscriptionCamera.reset();
+        SigillumTutorialClient.onLogout();
     }
 
     @SubscribeEvent
