@@ -1,9 +1,9 @@
 package com.aozainkmc.sigillum.client;
 
 import com.aozainkmc.core.AozaiInkCoreApi;
-import com.aozainkmc.core.api.GlyphDescriber;
 import com.aozainkmc.core.api.client.MoluMenuOpenHook;
 import com.aozainkmc.core.api.client.TalismanPlacedHook;
+import com.aozainkmc.input.api.GlyphPreviewRegistry;
 import com.aozainkmc.sigillum.SigillumMod;
 import com.aozainkmc.sigillum.client.tutorial.SigillumTutorialClient;
 import com.aozainkmc.sigillum.glyph.GlyphEffectDescriber;
@@ -19,7 +19,7 @@ public final class SigillumClientSetup {
     @SubscribeEvent
     public static void onClientSetup(FMLClientSetupEvent event) {
         event.enqueueWork(() -> {
-            AozaiInkCoreApi.registerService(GlyphDescriber.class, new GlyphEffectDescriber());
+            GlyphPreviewRegistry.register(SigillumMod.MOD_ID, new GlyphEffectDescriber());
             AozaiInkCoreApi.registerService(MoluMenuOpenHook.class, () -> SigillumTutorialClient.onMenuOpened());
             AozaiInkCoreApi.registerService(TalismanPlacedHook.class, () -> SigillumTutorialClient.onTalismanPlaced());
         });

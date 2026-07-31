@@ -7,8 +7,11 @@ import com.aozainkmc.sigillum.glyph.GlyphSemantics;
 import com.aozainkmc.sigillum.glyph.GlyphCodex;
 import com.aozainkmc.sigillum.cast.SigillumInscriptionManager;
 import com.aozainkmc.input.api.MoluMenuRegistry;
+import com.aozainkmc.input.api.TalismanSyntaxRegistry;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import net.minecraft.core.BlockPos;
 import com.aozainkmc.sigillum.network.SigillumNetworking;
 import com.mojang.logging.LogUtils;
@@ -24,7 +27,11 @@ public final class SigillumMod {
     public static final Logger LOGGER = LogUtils.getLogger();
 
     public SigillumMod(IEventBus modBus) {
-        AozaiInkCoreApi.registerGlyphs(GlyphSemantics.words());
+        Set<String> glyphs = new LinkedHashSet<>(GlyphSemantics.words());
+        glyphs.add("刻");
+        glyphs.addAll(List.of("强", "续", "广", "穿"));
+        AozaiInkCoreApi.registerGlyphs(glyphs);
+        TalismanSyntaxRegistry.register(MOD_ID, Set.of("刻"), GlyphSemantics.words(), Set.of("强", "续", "广", "穿"));
         registerMoluMenuContent();
         SigillumAdvancementTriggers.register(modBus);
         modBus.addListener(SigillumNetworking::registerPayloads);

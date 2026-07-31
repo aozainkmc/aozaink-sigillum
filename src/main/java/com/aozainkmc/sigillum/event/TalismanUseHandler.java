@@ -1,11 +1,8 @@
 package com.aozainkmc.sigillum.event;
 
-import com.aozainkmc.sigillum.network.BindingRitualPayload;
-import com.aozainkmc.sigillum.util.SigillumTexts;
 import com.aozainkmc.sigillum.advancement.SigillumAdvancementTriggers;
 import com.aozainkmc.sigillum.advancement.SigillumCriterionTrigger;
 import com.aozainkmc.sigillum.SigillumMod;
-import com.aozainkmc.sigillum.binding.GlyphBinding;
 import com.aozainkmc.sigillum.cast.SigillumInscriptionManager;
 import com.aozainkmc.sigillum.cast.SkillCast;
 import com.aozainkmc.sigillum.grade.TalismanGrade;
@@ -20,10 +17,7 @@ import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.particles.DustParticleOptions;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.HoverEvent;
-import net.minecraft.network.chat.Style;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -44,7 +38,6 @@ import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
-import net.neoforged.neoforge.network.PacketDistributor;
 import org.joml.Vector3f;
 
 @EventBusSubscriber(modid = SigillumMod.MOD_ID)
@@ -107,7 +100,6 @@ public final class TalismanUseHandler {
         String slot3 = tag.getString(TAG_SLOT3);
 
         switch (type) {
-            case "specified" -> useSpecified(player, slot1, slot2);
             case "inscription" -> useInscription(player, slot1, slot2, slot3, blockPos);
             case "combo" -> useCombo(player, tag, slot1, slot2, slot3);
             default -> useWaste(player);
@@ -118,63 +110,14 @@ public final class TalismanUseHandler {
         player.displayClientMessage(Component.literal(text), true);
     }
 
+    private static void playFailureFeedback(ServerPlayer player) {
+        player.playNotifySound(SoundEvents.NOTE_BLOCK_BASS.value(), SoundSource.PLAYERS, 0.8f, 0.5f);
+    }
+
     private static void useWaste(ServerPlayer player) {
         notice(player, "废符");
+        playFailureFeedback(player);
         consumeOne(player);
-    }
-
-    private static void useSpecified(ServerPlayer player, String number, String glyph) {
-        if (!GlyphBinding.isChineseDigit(number)) {
-            SigillumTexts.actionbar(player, "指定符数字无效", SigillumTexts.CINNABAR);
-            return;
-        }
-
-        GlyphBinding.bind(player, number, glyph);
-        SigillumAdvancementTriggers.specifiedBound(player, glyph);
-
-        SigillumTexts.actionbar(player,
-            SigillumTexts.colored(number + " → " + glyph + " 绑定完成", SigillumTexts.GOLD));
-
-        Component message = Component.empty()
-            .append(SigillumTexts.colored("已指定 ", SigillumTexts.CREAM))
-            .append(SigillumTexts.colored(number, SigillumTexts.GOLD))
-            .append(SigillumTexts.colored(" → ", SigillumTexts.CREAM))
-            .append(SigillumTexts.colored(glyph, SigillumTexts.GOLD))
-            .append(SigillumTexts.colored("（" + elementName(glyph) + "） ", SigillumTexts.CREAM))
-            .append(Component.literal("[点击查看]")
-                .withStyle(Style.EMPTY
-                    .withColor(SigillumTexts.GOLD)
-                    .withUnderlined(true)
-                    .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/sigillum menu"))
-                    .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
-                        Component.literal("打开快速吟唱设置")))));
-        player.sendSystemMessage(message, false);
-
-        ServerLevel level = player.serverLevel();
-        Vec3 center = player.position();
-        level.playSound(null, player.blockPosition(), SoundEvents.BEACON_POWER_SELECT,
-            SoundSource.PLAYERS, 0.7f, 1.5f);
-        level.playSound(null, player.blockPosition(), SoundEvents.EXPERIENCE_ORB_PICKUP,
-            SoundSource.PLAYERS, 0.3f, 1.3f);
-        PacketDistributor.sendToPlayer(player, new BindingRitualPayload(center.x, center.y, center.z));
-
-        consumeOne(player);
-    }
-
-    private static String elementName(String glyph) {
-        return switch (glyph) {
-            case "火" -> "离火";
-            case "雷" -> "震雷";
-            case "水", "净" -> "坎水";
-            case "护" -> "艮山";
-            case "斩" -> "兑金";
-            case "镇", "封" -> "坤土";
-            case "退", "引" -> "巽风";
-            case "明" -> "乾光";
-            case "吸" -> "噬灵";
-            case "魄" -> "归魂";
-            default -> "符咒";
-        };
     }
 
     private static void useInscription(ServerPlayer player, String slot1, String slot2, String slot3, BlockPos blockPos) {
@@ -226,11 +169,13 @@ public final class TalismanUseHandler {
         }
         if (blockPos == null) {
             notice(player, "刻印符需对准方块使用");
+            playFailureFeedback(player);
             return;
         }
 
         if (player.serverLevel().getBlockState(blockPos).isAir()) {
             notice(player, "刻印符目标方块无效");
+            playFailureFeedback(player);
             return;
         }
 
@@ -252,6 +197,8 @@ public final class TalismanUseHandler {
             spawnRedstoneOnFaces(player.serverLevel(), blockPos);
             spawnFlameBurst(player.serverLevel(), player.position());
             consumeOne(player);
+        } else {
+            playFailureFeedback(player);
         }
     }
 
@@ -307,6 +254,7 @@ public final class TalismanUseHandler {
         String overallLabel = overallLabel(tag, slots);
         if (overallM <= 0.0f) {
             notice(player, "组合符 · " + overallLabel + "，术式溃散");
+            playFailureFeedback(player);
             consumeOne(player);
             return;
         }
@@ -343,6 +291,7 @@ public final class TalismanUseHandler {
                 if (chuan) {
                     if (!SkillCast.supportsPiercingCombo(spec)) {
                         notice(player, spec.label() + " · 不支持穿透");
+                        playFailureFeedback(player);
                         consumeOne(player);
                         return;
                     }
@@ -376,6 +325,7 @@ public final class TalismanUseHandler {
 
             if (chuan) {
                 notice(player, "多字组合暂不支持穿透");
+                playFailureFeedback(player);
                 consumeOne(player);
                 return;
             }
@@ -418,6 +368,7 @@ public final class TalismanUseHandler {
                 triggerSuccessfulCast(player, skills, modifiers, false, affectedTarget, applied);
             } else {
                 notice(player, "组合符 · 术式溃散");
+                playFailureFeedback(player);
             }
             consumeOne(player);
             return;

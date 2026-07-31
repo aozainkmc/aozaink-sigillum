@@ -71,6 +71,10 @@ public final class SigillumShieldManager {
             SoundEvents.SHIELD_BLOCK, SoundSource.PLAYERS, 0.45f, 1.35f);
 
         if (state.amount <= 0.0f) {
+            player.serverLevel().playSound(null, player.blockPosition(),
+                SoundEvents.SHIELD_BREAK, SoundSource.PLAYERS, 1.0f, 1.0f);
+            player.serverLevel().playSound(null, player.blockPosition(),
+                SoundEvents.GLASS_BREAK, SoundSource.PLAYERS, 0.9f, 0.9f);
             clear(player);
         } else {
             sync(player, state);

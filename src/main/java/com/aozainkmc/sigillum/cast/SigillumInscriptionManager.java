@@ -26,6 +26,8 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.tags.EntityTypeTags;
 import net.minecraft.world.effect.MobEffectCategory;
 import net.minecraft.world.effect.MobEffectInstance;
@@ -105,6 +107,7 @@ public final class SigillumInscriptionManager {
         data.entries.put(pos.asLong(), entry);
         data.setDirty();
         broadcastReveal(level, player, entry, 0.0D);
+        level.playSound(null, pos, SoundEvents.BEACON_ACTIVATE, SoundSource.BLOCKS, 1.0f, 1.2f);
         return new ActivationResult(true, "刻印 · " + entry.name() + " · 持续约" + formatDuration(initialTicks));
     }
 
@@ -708,6 +711,7 @@ public final class SigillumInscriptionManager {
         }
 
         private void triggerDepleted(ServerLevel level) {
+            level.playSound(null, pos, SoundEvents.BEACON_DEACTIVATE, SoundSource.BLOCKS, 1.0f, 1.1f);
             ServerPlayer ownerPlayer = level.getServer().getPlayerList().getPlayer(owner);
             if (ownerPlayer != null) {
                 SigillumAdvancementTriggers.inscriptionChanged(ownerPlayer, SigillumCriterionTrigger.Event.empty()

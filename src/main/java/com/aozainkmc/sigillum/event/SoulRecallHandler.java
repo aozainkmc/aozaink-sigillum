@@ -13,6 +13,8 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.ItemStack;
@@ -86,6 +88,7 @@ public final class SoulRecallHandler {
         long gameTime = player.level().getGameTime();
         if (recovery == null || recovery.expiresAt <= gameTime || recovery.consumed) {
             player.displayClientMessage(Component.literal("魄: 没有可牵回的魄印"), true);
+            playFailureSound(player);
             return new RecoveryResult(false, 0, 0, null, null);
         }
 
@@ -103,10 +106,30 @@ public final class SoulRecallHandler {
         if (itemCount > 0 || xpRecovered > 0) {
             player.displayClientMessage(Component.literal("魄: 牵回 " + itemCount + " 件物品与 " + xpRecovered + " 点经验"), true);
             SigillumAdvancementTriggers.soulRecalled(player, itemCount + xpRecovered);
+            playRecallSound(player, ratio);
             return new RecoveryResult(true, itemCount, xpRecovered, deathDimension, deathPos);
         }
         player.displayClientMessage(Component.literal("魄: 魄印已散，死亡掉落可能已消失"), true);
+        playFailureSound(player);
         return new RecoveryResult(false, 0, 0, deathDimension, deathPos);
+    }
+
+    private static void playRecallSound(ServerPlayer player, float ratio) {
+        ServerLevel level = player.serverLevel();
+        if (ratio >= 0.99f) {
+            level.playSound(null, player.blockPosition(), SoundEvents.SOUL_ESCAPE.value(), SoundSource.PLAYERS, 1.0f, 1.0f);
+            level.playSound(null, player.blockPosition(), SoundEvents.EXPERIENCE_ORB_PICKUP, SoundSource.PLAYERS, 0.8f, 1.2f);
+            level.playSound(null, player.blockPosition(), SoundEvents.AMETHYST_BLOCK_RESONATE, SoundSource.PLAYERS, 0.9f, 1.1f);
+        } else if (ratio >= 0.6f) {
+            level.playSound(null, player.blockPosition(), SoundEvents.SOUL_ESCAPE.value(), SoundSource.PLAYERS, 1.0f, 0.8f);
+            level.playSound(null, player.blockPosition(), SoundEvents.EXPERIENCE_ORB_PICKUP, SoundSource.PLAYERS, 0.6f, 0.9f);
+        } else {
+            level.playSound(null, player.blockPosition(), SoundEvents.SOUL_ESCAPE.value(), SoundSource.PLAYERS, 0.8f, 0.6f);
+        }
+    }
+
+    private static void playFailureSound(ServerPlayer player) {
+        player.playNotifySound(SoundEvents.NOTE_BLOCK_BASS.value(), SoundSource.PLAYERS, 0.8f, 0.5f);
     }
 
     private static SoulRecovery ensureRecovery(ServerPlayer player, long gameTime) {

@@ -12,6 +12,8 @@ import java.util.List;
 import com.aozainkmc.sigillum.util.SigillumTexts;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import com.aozainkmc.input.api.QuickBindingChangedEvent;
@@ -106,6 +108,7 @@ public final class SigillumEventListener {
         if (!SkillCast.isImplementedSkill(glyph)) {
             event.setCanceled(true);
             SigillumTexts.actionbar(event.player(), "指定字 " + glyph + " 不是可用术式", SigillumTexts.CINNABAR);
+            serverPlayer.playNotifySound(SoundEvents.NOTE_BLOCK_BASS.value(), SoundSource.PLAYERS, 0.8f, 0.5f);
             return;
         }
 
