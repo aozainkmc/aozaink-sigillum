@@ -75,6 +75,11 @@ public final class SoulRecallHandler {
 
     private enum Delivery { INVENTORY, FEET }
 
+    public static boolean hasActiveRecovery(ServerPlayer player) {
+        SoulRecovery recovery = RECOVERIES.get(player.getUUID());
+        return recovery != null && recovery.expiresAt > player.level().getGameTime() && !recovery.consumed;
+    }
+
     public static RecoveryResult recover(ServerPlayer player, float ratio) {
         return recover(player, ratio, Delivery.INVENTORY);
     }

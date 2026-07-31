@@ -292,4 +292,18 @@ class GlyphEffectDescriberTest {
         assertTrue(lines.get(0).contains("负面"));
         assertTrue(lines.get(0).contains("抵消"));
     }
+
+    @Test
+    void soulDetailMentionsWard() {
+        List<String> lines = describer.describe(List.of("魄"));
+
+        assertTrue(lines.get(0).contains("定魄"));
+    }
+
+    @Test
+    void lightDetailMentionsOreReveal() {
+        List<String> lines = describer.describe(List.of("明"));
+
+        assertTrue(lines.get(0).contains("显矿"));
+    }
 }

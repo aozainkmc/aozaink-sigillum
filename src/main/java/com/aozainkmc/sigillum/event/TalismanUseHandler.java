@@ -386,6 +386,17 @@ public final class TalismanUseHandler {
         float durationM = xu ? 1.0f + overallM : 1.0f;
         SkillCast.CastEnv env = new SkillCast.CastEnv(powerM, durationM);
 
+        if (chuan && "明".equals(skill)) {
+            int maxHits = overallM >= 1.0f ? 3 : (overallM >= 0.8f ? 2 : 1);
+            int hits = castPiercing(player, skill, env, maxHits);
+            SkillCast.applySelf(player, skill, env);
+            int ores = OreRevealManager.revealRayAll(player, SkillCast.ORE_PIERCE_RAY_MAX, SkillCast.ORE_PIERCE_RAY_CAP, SkillCast.ORE_RAY_MARK_TICKS);
+            consumeOne(player);
+            notice(player, skill + " · " + overallLabel + " 穿透命中 " + hits + " 个 · 显矿 " + ores + " 处");
+            triggerSuccessfulCast(player, skills, modifiers, false, true, hits);
+            return;
+        }
+
         if (chuan && SkillCast.hasTargetEffect(skill)) {
             int maxHits = overallM >= 1.0f ? 3 : (overallM >= 0.8f ? 2 : 1);
             int hits = castPiercing(player, skill, env, maxHits);
@@ -410,10 +421,10 @@ public final class TalismanUseHandler {
         }
 
         if (guang && "明".equals(skill)) {
-            int hit = SkillCast.applyWideLight(player, env);
+            SkillCast.WideLightResult wideLight = SkillCast.applyWideLight(player, env);
             consumeOne(player);
-            notice(player, skill + " · " + overallLabel + " 广域照妖 " + hit + " 个");
-            triggerSuccessfulCast(player, skills, modifiers, false, true, hit);
+            notice(player, skill + " · " + overallLabel + " 广域照妖 " + wideLight.lit() + " 个 · 显矿 " + wideLight.ores() + " 处");
+            triggerSuccessfulCast(player, skills, modifiers, false, true, wideLight.lit());
             return;
         }
 

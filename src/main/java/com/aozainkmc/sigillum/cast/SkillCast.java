@@ -2,7 +2,9 @@ package com.aozainkmc.sigillum.cast;
 
 import com.aozainkmc.sigillum.advancement.SigillumAdvancementTriggers;
 import com.aozainkmc.sigillum.advancement.SigillumCriterionTrigger;
+import com.aozainkmc.sigillum.event.OreRevealManager;
 import com.aozainkmc.sigillum.event.SoulRecallHandler;
+import com.aozainkmc.sigillum.event.SoulWardHandler;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -56,6 +58,11 @@ public final class SkillCast {
     private static final int LIGHT_RADIUS = 24;
     private static final int LIGHT_TICKS = 20 * 60 * 5;
     private static final int LIGHT_WIDE_TICKS = 20 * 75;
+    public static final double ORE_RAY_RANGE = 32.0;
+    public static final long ORE_RAY_MARK_TICKS = 600L;
+    public static final double ORE_PIERCE_RAY_MAX = 128.0;
+    public static final int ORE_PIERCE_RAY_CAP = 64;
+    public static final int ORE_WIDE_CAP = 96;
 
     private SkillCast() {}
 
@@ -240,7 +247,14 @@ public final class SkillCast {
             case "护" -> applyShield(player, env);
             case "净" -> applyPurify(player, env);
             case "明" -> applyLightSelf(player, env);
-            case "魄" -> applySoulRecall(player, env);
+            case "魄" -> applySoulSelf(player, env);
+        }
+    }
+
+    private static void applySoulSelf(ServerPlayer player, CastEnv env) {
+        SoulWardHandler.ward(player, env.multiplier(), env.durationMultiplier());
+        if (SoulRecallHandler.hasActiveRecovery(player)) {
+            applySoulRecall(player, env);
         }
     }
 
@@ -1080,6 +1094,7 @@ public final class SkillCast {
 
     private static void applyLightSelf(ServerPlayer player, CastEnv env) {
         applyNightVision(player, lightTicks(env));
+        OreRevealManager.revealRayFirst(player, ORE_RAY_RANGE, ORE_RAY_MARK_TICKS);
     }
 
     private static void applyLightTarget(ServerPlayer player, LivingEntity target, CastEnv env) {
@@ -1090,11 +1105,15 @@ public final class SkillCast {
             8, 0.2, 0.35, 0.2, 0.03);
     }
 
-    public static int applyWideLight(ServerPlayer player, CastEnv env) {
+    public static WideLightResult applyWideLight(ServerPlayer player, CastEnv env) {
         int ticks = wideLightTicks(env);
         applyNightVision(player, ticks);
-        return applyLightArea(player, env, ticks);
+        int lit = applyLightArea(player, env, ticks);
+        int ores = OreRevealManager.revealAround(player, LIGHT_RADIUS, ORE_WIDE_CAP, LIGHT_WIDE_TICKS);
+        return new WideLightResult(lit, ores);
     }
+
+    public record WideLightResult(int lit, int ores) {}
 
     private static void applyNightVision(ServerPlayer player, int ticks) {
         player.addEffect(new MobEffectInstance(MobEffects.NIGHT_VISION, ticks, 0));
