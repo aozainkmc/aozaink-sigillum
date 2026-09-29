@@ -12,9 +12,11 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.IntConsumer;
+import java.util.function.Predicate;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
@@ -29,6 +31,7 @@ import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.effect.MobEffectCategory;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LightningBolt;
 import net.minecraft.world.entity.LivingEntity;
@@ -213,7 +216,8 @@ public final class SkillCast {
 
     private static Outcome cast(ServerPlayer player, String glyph, CastEnv env, double aimTolerance) {
         TargetRequirement targetRequirement = targetRequirement(glyph);
-        LivingEntity target = targetRequirement == TargetRequirement.NONE ? null : targetLiving(player, aimTolerance);
+        LivingEntity target = targetRequirement == TargetRequirement.NONE ? null
+            : targetLiving(player, aimTolerance, hitsAllyCreatures(glyph));
         if (targetRequirement == TargetRequirement.REQUIRED && target == null) return Outcome.MISS;
 
         boolean applied = false;
@@ -623,7 +627,7 @@ public final class SkillCast {
         scheduleWhile(Math.round(80.0f * env.durationMultiplier()), player::isAlive, tick -> {
             AABB box = player.getBoundingBox().inflate(0.75);
             for (LivingEntity entity : player.serverLevel().getEntitiesOfClass(LivingEntity.class, box,
-                    e -> e != player && e.isAlive())) {
+                    e -> e != player && e.isAlive() && !isAllyCreature(player, e))) {
                 applyRepelFromCenter(player.serverLevel(), player.position(), entity, 0.75 * Math.max(1.0f, env.multiplier()));
             }
         });
@@ -989,7 +993,7 @@ public final class SkillCast {
             }
         }
 
-        LivingEntity target = targetLiving(player);
+        LivingEntity target = targetLiving(player, false);
         if (target != null && target.getType().is(EntityTypeTags.UNDEAD)) {
             target.invulnerableTime = 0;
             target.hurt(level.damageSources().magic(), 4.0f * env.multiplier());
@@ -1202,20 +1206,45 @@ public final class SkillCast {
         level.playSound(null, BlockPos.containing(center), SoundEvents.PLAYER_ATTACK_KNOCKBACK, SoundSource.PLAYERS, 0.7f, 0.8f);
     }
 
-    public static LivingEntity targetLiving(ServerPlayer player) {
-        return targetLiving(player, TARGET_AIM_TOLERANCE);
+    /**
+     * A creature that belongs to the caster or a teammate, such as a bean soldier (asked through
+     * the core channel aozaink_sigillum:owner). Of all skills only 雷 affects them: every other
+     * skill ignores them, and aiming passes straight through them to whatever is behind.
+     */
+    public static boolean isAllyCreature(ServerPlayer caster, Entity entity) {
+        if (!(entity instanceof LivingEntity living) || entity instanceof Player) return false;
+        UUID owner = SigillumChannels.OWNER.first(living).orElse(null);
+        if (owner == null) return false;
+        if (owner.equals(caster.getUUID())) return true;
+        ServerPlayer keeper = caster.server.getPlayerList().getPlayer(owner);
+        return keeper != null && caster.isAlliedTo(keeper);
     }
 
-    private static LivingEntity targetLiving(ServerPlayer player, double aimTolerance) {
-        HitResult hr = ProjectileUtil.getHitResultOnViewVector(player,
-            e -> e instanceof LivingEntity && e != player && e.isAlive(), RANGE);
+    /** Whether this skill leaves the entity alone because it is one of the caster's own creatures. */
+    public static boolean spares(ServerPlayer caster, Entity entity, String skill) {
+        return !hitsAllyCreatures(skill) && isAllyCreature(caster, entity);
+    }
+
+    public static boolean hitsAllyCreatures(String skill) {
+        return "雷".equals(skill);
+    }
+
+    /** The living entity under the crosshair; with hitAllies false, the caster's own creatures are looked through. */
+    public static LivingEntity targetLiving(ServerPlayer player, boolean hitAllies) {
+        return targetLiving(player, TARGET_AIM_TOLERANCE, hitAllies);
+    }
+
+    private static LivingEntity targetLiving(ServerPlayer player, double aimTolerance, boolean hitAllies) {
+        Predicate<Entity> candidate = e -> e instanceof LivingEntity && e != player && e.isAlive()
+            && (hitAllies || !isAllyCreature(player, e));
+        HitResult hr = ProjectileUtil.getHitResultOnViewVector(player, candidate, RANGE);
         if (hr instanceof EntityHitResult ehr && ehr.getEntity() instanceof LivingEntity le) {
             return le;
         }
-        return forgivingTargetLiving(player, aimTolerance);
+        return forgivingTargetLiving(player, aimTolerance, candidate);
     }
 
-    private static LivingEntity forgivingTargetLiving(ServerPlayer player, double aimTolerance) {
+    private static LivingEntity forgivingTargetLiving(ServerPlayer player, double aimTolerance, Predicate<Entity> candidateFilter) {
         Vec3 start = player.getEyePosition(1.0f);
         Vec3 maxEnd = start.add(player.getViewVector(1.0f).scale(RANGE));
         HitResult blockLimit = ProjectileUtil.getHitResultOnViewVector(player, e -> false, RANGE);
@@ -1225,7 +1254,7 @@ public final class SkillCast {
 
         AABB sweep = new AABB(start, end).inflate(aimTolerance);
         for (LivingEntity candidate : player.serverLevel().getEntitiesOfClass(LivingEntity.class, sweep,
-                e -> e != player && e.isAlive())) {
+                candidateFilter::test)) {
             AABB targetBox = candidate.getBoundingBox().inflate(aimTolerance);
             double distanceSqr;
             if (targetBox.contains(start)) {

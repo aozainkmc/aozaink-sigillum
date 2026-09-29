@@ -353,7 +353,7 @@ public final class SigillumInscriptionManager {
             boolean changed = false;
             double radiusSqr = radius * radius;
             for (Projectile projectile : projectiles) {
-                if (isPlayerProjectile(projectile)) continue;
+                if (passesWard(level, projectile)) continue;
                 Vec3 projectilePos = projectile.position();
                 if (projectilePos.distanceToSqr(center) > radiusSqr) continue;
                 projectile.discard();
@@ -367,9 +367,10 @@ public final class SigillumInscriptionManager {
             return changed;
         }
 
-        private boolean isPlayerProjectile(Projectile projectile) {
+        private boolean passesWard(ServerLevel level, Projectile projectile) {
             Entity owner = projectile.getOwner();
-            return owner instanceof Player;
+            return owner instanceof Player
+                || (owner instanceof LivingEntity shooter && wardSide(level, shooter) == WardSide.ALLY);
         }
 
         private boolean tick(ServerLevel level) {
@@ -383,14 +384,17 @@ public final class SigillumInscriptionManager {
             for (LivingEntity entity : entities) {
                 if (entity.getBoundingBox().distanceToSqr(center) > radius * radius) continue;
                 present.add(entity.getUUID());
-                if (skills.contains("护") && wardSide(level, entity) == WardSide.INTRUDER) {
+                WardSide side = wardSide(level, entity);
+                boolean allyCreature = side == WardSide.ALLY && !(entity instanceof Player);
+                if (skills.contains("护") && side == WardSide.INTRUDER) {
                     wardBoundary(entity, center);
                 }
-                if (skills.contains("引")) {
+                if (skills.contains("引") && !allyCreature) {
                     continuousLure(entity, center, power);
                 }
                 for (String skill : skills) {
                     if (energy <= 0) return true;
+                    if (allyCreature && !"雷".equals(skill) && !"护".equals(skill)) continue;
                     CooldownKey key = new CooldownKey(entity.getUUID(), skill);
                     if (cooldowns.getOrDefault(key, 0) > 0) continue;
                     int cooldown = cooldown(skill, entity);

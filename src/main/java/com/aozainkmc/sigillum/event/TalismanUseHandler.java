@@ -273,7 +273,7 @@ public final class TalismanUseHandler {
             boolean needsTarget = spec != null ? spec.needsTarget() : hasRequiredTargetSkill(skills);
             LivingEntity primary = null;
             if (needsTarget && !chuan) {
-                primary = SkillCast.targetLiving(player);
+                primary = SkillCast.targetLiving(player, false);
                 if (primary == null) {
                     Vec3 missPoint = SkillCast.landPoint(player);
                     miss(player, "组合符 · 未着", missPoint);
@@ -351,6 +351,7 @@ public final class TalismanUseHandler {
                     AABB box = new AABB(primary.blockPosition()).inflate(SkillCast.AOE_RADIUS);
                     for (LivingEntity target : player.serverLevel().getEntitiesOfClass(LivingEntity.class, box,
                             e -> e != player && e.isAlive())) {
+                        if (SkillCast.spares(player, target, s)) continue;
                         SkillCast.applyToTarget(player, target, s, aoeEnv);
                         applied++;
                     }
@@ -429,7 +430,7 @@ public final class TalismanUseHandler {
         }
 
         if (guang && SkillCast.hasTargetEffect(skill)) {
-            LivingEntity primary = SkillCast.targetLiving(player);
+            LivingEntity primary = SkillCast.targetLiving(player, SkillCast.hitsAllyCreatures(skill));
             if (primary == null) {
                 Vec3 missPoint = SkillCast.landPoint(player);
                 miss(player, skill + "符 · 未着", missPoint);
@@ -442,6 +443,7 @@ public final class TalismanUseHandler {
             int hit = 0;
             for (LivingEntity target : player.serverLevel().getEntitiesOfClass(LivingEntity.class, box,
                     e -> e != player && e.isAlive())) {
+                if (SkillCast.spares(player, target, skill)) continue;
                 SkillCast.applyToTarget(player, target, skill, aoeEnv);
                 hit++;
             }
@@ -548,7 +550,7 @@ public final class TalismanUseHandler {
         Set<UUID> hit = new HashSet<>();
         int hits = 0;
         for (int i = 0; i < maxHits; i++) {
-            EntityHitResult result = nextPierceTarget(player, hit);
+            EntityHitResult result = nextPierceTarget(player, hit, SkillCast.hitsAllyCreatures(skill));
             if (result == null || !(result.getEntity() instanceof LivingEntity target)) break;
             SkillCast.applyToTarget(player, target, skill, env);
             hit.add(target.getUUID());
@@ -562,7 +564,7 @@ public final class TalismanUseHandler {
         Set<UUID> hit = new HashSet<>();
         int hits = 0;
         for (int i = 0; i < maxHits; i++) {
-            EntityHitResult result = nextPierceTarget(player, hit);
+            EntityHitResult result = nextPierceTarget(player, hit, false);
             if (result == null || !(result.getEntity() instanceof LivingEntity target)) break;
             SkillCast.applyLinkedCombo(player, target, spec, env);
             hit.add(target.getUUID());
@@ -589,7 +591,7 @@ public final class TalismanUseHandler {
         SkillCast.CastEnv areaEnv = env.withMultiplier(0.7f).withoutSelfSupport();
         AABB box = new AABB(primary.blockPosition()).inflate(SkillCast.AOE_RADIUS);
         for (LivingEntity target : player.serverLevel().getEntitiesOfClass(LivingEntity.class, box,
-                e -> e != player && e.isAlive())) {
+                e -> e != player && e.isAlive() && !SkillCast.isAllyCreature(player, e))) {
             if (!applied.add(target.getUUID())) continue;
             SkillCast.applyLinkedCombo(player, target, spec, areaEnv);
             hits++;
@@ -597,13 +599,14 @@ public final class TalismanUseHandler {
         return hits;
     }
 
-    private static EntityHitResult nextPierceTarget(ServerPlayer player, Set<UUID> excluded) {
+    private static EntityHitResult nextPierceTarget(ServerPlayer player, Set<UUID> excluded, boolean hitAllies) {
         Vec3 start = player.getEyePosition(1.0f);
         Vec3 end = start.add(player.getViewVector(1.0f).scale(SkillCast.RANGE));
         AABB box = player.getBoundingBox().expandTowards(end).inflate(1.0);
         return net.minecraft.world.entity.projectile.ProjectileUtil.getEntityHitResult(
             player.serverLevel(), player, start, end, box,
-            e -> e instanceof LivingEntity && e != player && e.isAlive() && !excluded.contains(e.getUUID()));
+            e -> e instanceof LivingEntity && e != player && e.isAlive() && !excluded.contains(e.getUUID())
+                && (hitAllies || !SkillCast.isAllyCreature(player, e)));
     }
 
     private static ItemStack downgradedStack(ServerPlayer player, CompoundTag tag, int skillSlot, int hits) {
