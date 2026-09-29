@@ -31,7 +31,7 @@ side="BOTH"
 [[dependencies.${mod_id}]]
 modId="aozaink_core"
 type="required"
-versionRange="${mod_version}"
+versionRange="[0.1.0-alpha.4,)"
 ordering="AFTER"
 side="BOTH"
 
