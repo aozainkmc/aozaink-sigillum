@@ -22,7 +22,11 @@ public final class SigillumShieldEvents {
     // finished changing the amount.
     @SubscribeEvent(priority = EventPriority.LOW)
     public static void onLivingDamage(LivingIncomingDamageEvent event) {
-        if (!(event.getEntity() instanceof ServerPlayer player)) return;
+        if (event.getEntity().level().isClientSide()) return;
+        if (!(event.getEntity() instanceof ServerPlayer player)) {
+            event.setAmount(SigillumShieldManager.absorbAlly(event.getEntity(), event.getAmount()));
+            return;
+        }
         Entity attacker = event.getSource().getEntity();
         float incoming = SigillumComboState.beforeShieldDamage(player, attacker, event.getAmount());
         String continuousKey = continuousDamageKey(event.getSource());
@@ -46,6 +50,8 @@ public final class SigillumShieldEvents {
     public static void onLivingDeath(LivingDeathEvent event) {
         if (event.getEntity() instanceof ServerPlayer player) {
             SigillumShieldManager.clear(player);
+        } else {
+            SigillumShieldManager.clearAlly(event.getEntity());
         }
     }
 

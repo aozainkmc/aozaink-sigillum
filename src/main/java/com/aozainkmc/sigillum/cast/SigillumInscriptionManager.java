@@ -56,6 +56,8 @@ public final class SigillumInscriptionManager {
     private static final DustParticleOptions SHIELD_CINNABAR_PARTICLE =
         new DustParticleOptions(new Vector3f(0.78f, 0.12f, 0.05f), 0.55f);
 
+    private enum WardSide { ALLY, INTRUDER, NEUTRAL }
+
     private SigillumInscriptionManager() {}
 
     public record ActivationResult(boolean consume, String message) {}
@@ -381,7 +383,7 @@ public final class SigillumInscriptionManager {
             for (LivingEntity entity : entities) {
                 if (entity.getBoundingBox().distanceToSqr(center) > radius * radius) continue;
                 present.add(entity.getUUID());
-                if (skills.contains("护") && entity instanceof Enemy) {
+                if (skills.contains("护") && wardSide(level, entity) == WardSide.INTRUDER) {
                     wardBoundary(entity, center);
                 }
                 if (skills.contains("引")) {
@@ -539,15 +541,48 @@ public final class SigillumInscriptionManager {
         }
 
         private boolean ward(ServerLevel level, ServerPlayer ownerPlayer, LivingEntity entity, Vec3 center, float power) {
+            WardSide side = wardSide(level, entity);
+            if (side == WardSide.INTRUDER) {
+                entity.invulnerableTime = 0;
+                hurtWithOwner(level, ownerPlayer, entity, wardDamage(entity, center, power));
+                drawWardRipple(level, center, entity);
+                return true;
+            }
             if (entity instanceof ServerPlayer player) {
                 SigillumShieldManager.grant(player, SkillCast.shieldAmount(power));
                 return true;
             }
-            if (!(entity instanceof Enemy)) return false;
-            entity.invulnerableTime = 0;
-            hurtWithOwner(level, ownerPlayer, entity, wardDamage(entity, center, power));
-            drawWardRipple(level, center, entity);
-            return true;
+            if (side == WardSide.ALLY) {
+                SigillumShieldManager.grantAlly(entity, SkillCast.shieldAmount(power));
+                return true;
+            }
+            return false;
+        }
+
+        // Who 刻护 protects and who it repels. Allies: the owner, the owner's teammates, and
+        // creatures belonging to either. Intruders: hostile mobs, creatures belonging to anyone
+        // else, and players outside the owner's team while PvP is on. Everyone else (players when
+        // PvP is off, creative or spectator players, passive mobs) is left alone, except that
+        // non-hostile players still get the shield as before.
+        private WardSide wardSide(ServerLevel level, LivingEntity entity) {
+            ServerPlayer ownerPlayer = level.getServer().getPlayerList().getPlayer(owner);
+            if (entity instanceof Player player) {
+                if (player.getUUID().equals(owner) || (ownerPlayer != null && ownerPlayer.isAlliedTo(player))) {
+                    return WardSide.ALLY;
+                }
+                if (player.isCreative() || player.isSpectator() || !level.getServer().isPvpAllowed()) {
+                    return WardSide.NEUTRAL;
+                }
+                return WardSide.INTRUDER;
+            }
+            UUID creatureOwner = SigillumChannels.OWNER.first(entity).orElse(null);
+            if (creatureOwner != null) {
+                if (creatureOwner.equals(owner)) return WardSide.ALLY;
+                ServerPlayer keeper = level.getServer().getPlayerList().getPlayer(creatureOwner);
+                return ownerPlayer != null && keeper != null && ownerPlayer.isAlliedTo(keeper)
+                    ? WardSide.ALLY : WardSide.INTRUDER;
+            }
+            return entity instanceof Enemy ? WardSide.INTRUDER : WardSide.NEUTRAL;
         }
 
         private void wardBoundary(LivingEntity target, Vec3 center) {
@@ -595,7 +630,8 @@ public final class SigillumInscriptionManager {
         }
 
         private int energyCost(String skill, LivingEntity entity, Vec3 center) {
-            if (!"护".equals(skill) || !(entity instanceof Enemy)) return 1;
+            if (!"护".equals(skill) || !(entity.level() instanceof ServerLevel level)
+                    || wardSide(level, entity) != WardSide.INTRUDER) return 1;
             double distance = entity.getBoundingBox().getCenter().distanceTo(center);
             double proximity = 1.0 - Math.min(1.0, distance / Math.max(1.0, radius));
             return proximity >= 0.5 ? 2 : 1;
@@ -720,7 +756,8 @@ public final class SigillumInscriptionManager {
         }
 
         private int cooldown(String skill, LivingEntity entity) {
-            if ("护".equals(skill) && entity instanceof Enemy) return 20;
+            if ("护".equals(skill) && entity.level() instanceof ServerLevel level
+                    && wardSide(level, entity) == WardSide.INTRUDER) return 20;
             return switch (skill) {
                 case "镇", "封", "吸", "净" -> 40;
                 case "退" -> 10;

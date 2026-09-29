@@ -7,16 +7,22 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.UUID;
+import java.util.WeakHashMap;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.entity.LivingEntity;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 public final class SigillumShieldManager {
     private static final Map<UUID, ShieldState> SHIELDS = new HashMap<>();
     private static final Map<UUID, Map<String, Long>> CONTINUOUS_BLOCK_UNTIL = new HashMap<>();
+    // Shields on allied creatures other than players (another module's summons answering the
+    // aozaink_sigillum:owner channel). No HUD; kept in memory only and dropped when they go.
+    private static final Map<LivingEntity, ShieldState> ALLY_SHIELDS = new WeakHashMap<>();
 
     private SigillumShieldManager() {}
 
@@ -102,7 +108,41 @@ public final class SigillumShieldManager {
         return remaining;
     }
 
+    /** Shield on an allied non-player creature, capped the same way a player's shield is. */
+    public static void grantAlly(LivingEntity entity, float amount) {
+        if (amount <= 0.0f) return;
+        ShieldState current = ALLY_SHIELDS.get(entity);
+        float max = Math.max(amount, current == null ? amount : current.max);
+        float shield = current == null ? amount : Math.min(max, current.amount + amount);
+        ALLY_SHIELDS.put(entity, new ShieldState(shield, max));
+    }
+
+    public static float absorbAlly(LivingEntity entity, float damage) {
+        if (damage <= 0.0f) return damage;
+        ShieldState state = ALLY_SHIELDS.get(entity);
+        if (state == null || state.amount <= 0.0f) return damage;
+        float blocked = Math.min(state.amount, damage);
+        state.amount -= blocked;
+        if (entity.level() instanceof ServerLevel level) {
+            level.sendParticles(ParticleTypes.ENCHANT, entity.getX(), entity.getY() + entity.getBbHeight() * 0.6,
+                entity.getZ(), 8, 0.25, 0.3, 0.25, 0.3);
+            if (state.amount <= 0.0f) {
+                level.playSound(null, entity.blockPosition(), SoundEvents.GLASS_BREAK, SoundSource.NEUTRAL, 0.6f, 1.2f);
+            }
+        }
+        if (state.amount <= 0.0f) ALLY_SHIELDS.remove(entity);
+        return Math.max(0.0f, damage - blocked);
+    }
+
+    public static void clearAlly(LivingEntity entity) {
+        ALLY_SHIELDS.remove(entity);
+    }
+
     public static void tick(MinecraftServer server) {
+        if (!ALLY_SHIELDS.isEmpty()) {
+            ALLY_SHIELDS.entrySet().removeIf(entry -> !entry.getKey().isAlive() || entry.getKey().isRemoved()
+                || entry.getValue().amount <= 0.0f);
+        }
         if (SHIELDS.isEmpty()) return;
         Iterator<Map.Entry<UUID, ShieldState>> iterator = SHIELDS.entrySet().iterator();
         while (iterator.hasNext()) {
