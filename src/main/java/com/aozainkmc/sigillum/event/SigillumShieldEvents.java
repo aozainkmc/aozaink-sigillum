@@ -7,6 +7,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.damagesource.DamageTypes;
 import net.minecraft.server.level.ServerPlayer;
+import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
@@ -17,7 +18,9 @@ import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 public final class SigillumShieldEvents {
     private SigillumShieldEvents() {}
 
-    @SubscribeEvent
+    // LOW so the shield soaks damage after other modules (Arsenal's crit, pierce and reduction) have
+    // finished changing the amount.
+    @SubscribeEvent(priority = EventPriority.LOW)
     public static void onLivingDamage(LivingIncomingDamageEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
         Entity attacker = event.getSource().getEntity();
