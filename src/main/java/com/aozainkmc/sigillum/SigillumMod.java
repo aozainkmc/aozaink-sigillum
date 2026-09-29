@@ -35,6 +35,8 @@ public final class SigillumMod {
         registerMoluMenuContent();
         SigillumAdvancementTriggers.register(modBus);
         modBus.addListener(SigillumNetworking::registerPayloads);
+        com.aozainkmc.sigillum.cast.SigillumChannels.SHELTER.provide(
+            com.aozainkmc.sigillum.cast.SigillumInscriptionManager::shelterFromTime);
         NeoForge.EVENT_BUS.addListener(this::registerCommands);
     }
 

@@ -2,6 +2,7 @@ package com.aozainkmc.sigillum.cast;
 
 import com.aozainkmc.core.api.InkChannel;
 import com.aozainkmc.sigillum.SigillumMod;
+import com.mojang.datafixers.util.Pair;
 import java.util.UUID;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.LivingEntity;
@@ -16,6 +17,14 @@ public final class SigillumChannels {
      */
     public static final InkChannel<LivingEntity, UUID> OWNER = InkChannel.of(
         ResourceLocation.fromNamespaceAndPath(SigillumMod.MOD_ID, "owner"), LivingEntity.class, UUID.class);
+
+    /**
+     * {@code aozaink_beansoldier:shelter}, owned by Beansoldier. Question: a creature and the health
+     * it is about to lose to time away from its owner (not a hit). Answer: how much of it someone
+     * else takes instead. Sigillum answers through SigillumInscriptionManager.shelterFromTime.
+     */
+    public static final InkChannel<Pair<LivingEntity, Float>, Float> SHELTER = InkChannel.of(
+        ResourceLocation.fromNamespaceAndPath("aozaink_beansoldier", "shelter"), Pair.class, Float.class);
 
     private SigillumChannels() {}
 }

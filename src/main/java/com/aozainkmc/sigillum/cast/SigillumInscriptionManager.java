@@ -5,6 +5,7 @@ import com.aozainkmc.sigillum.advancement.SigillumCriterionTrigger;
 import com.aozainkmc.sigillum.event.SoulRecallHandler;
 import com.aozainkmc.sigillum.network.InscriptionStatusPayload;
 import com.aozainkmc.sigillum.network.InscriptionRevealPayload;
+import com.mojang.datafixers.util.Pair;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -15,6 +16,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import javax.annotation.Nullable;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.particles.DustParticleOptions;
@@ -136,6 +138,24 @@ public final class SigillumInscriptionManager {
             return List.copyOf(result.subList(0, limit));
         }
         return List.copyOf(result);
+    }
+
+    /**
+     * Answers Beansoldier's core channel aozaink_beansoldier:shelter: a creature about to lose
+     * health to time away from its owner. Standing in its owner's or a teammate's active 刻护, the
+     * ward takes all of it; this covers the loss charged in one go when an unloaded chunk comes back,
+     * since the ward was paused for that same time. Otherwise a leftover ward shield soaks what it can.
+     */
+    @Nullable
+    public static Float shelterFromTime(Pair<LivingEntity, Float> question) {
+        LivingEntity entity = question.getFirst();
+        float amount = question.getSecond() == null ? 0.0f : question.getSecond();
+        if (amount <= 0.0f || !(entity.level() instanceof ServerLevel level)) return null;
+        for (Entry entry : data(level).entries.values()) {
+            if (entry.shelters(level, entity)) return amount;
+        }
+        float absorbed = SigillumShieldManager.absorbAllyQuietly(entity, amount);
+        return absorbed > 0.0f ? absorbed : null;
     }
 
     public static void tick(MinecraftServer server) {
@@ -367,6 +387,12 @@ public final class SigillumInscriptionManager {
             return changed;
         }
 
+        private boolean shelters(ServerLevel level, LivingEntity entity) {
+            return skills.contains("护") && remainingTicks > 0 && energy > 0
+                && entity.getBoundingBox().distanceToSqr(Vec3.atCenterOf(pos)) <= radius * radius
+                && wardSide(level, entity) == WardSide.ALLY;
+        }
+
         private boolean passesWard(ServerLevel level, Projectile projectile) {
             Entity owner = projectile.getOwner();
             return owner instanceof Player
@@ -569,9 +595,8 @@ public final class SigillumInscriptionManager {
         // PvP is off, creative or spectator players, passive mobs) is left alone, except that
         // non-hostile players still get the shield as before.
         private WardSide wardSide(ServerLevel level, LivingEntity entity) {
-            ServerPlayer ownerPlayer = level.getServer().getPlayerList().getPlayer(owner);
             if (entity instanceof Player player) {
-                if (player.getUUID().equals(owner) || (ownerPlayer != null && ownerPlayer.isAlliedTo(player))) {
+                if (SigillumTeams.sameSide(level.getServer(), owner, player.getUUID())) {
                     return WardSide.ALLY;
                 }
                 if (player.isCreative() || player.isSpectator() || !level.getServer().isPvpAllowed()) {
@@ -581,10 +606,7 @@ public final class SigillumInscriptionManager {
             }
             UUID creatureOwner = SigillumChannels.OWNER.first(entity).orElse(null);
             if (creatureOwner != null) {
-                if (creatureOwner.equals(owner)) return WardSide.ALLY;
-                ServerPlayer keeper = level.getServer().getPlayerList().getPlayer(creatureOwner);
-                return ownerPlayer != null && keeper != null && ownerPlayer.isAlliedTo(keeper)
-                    ? WardSide.ALLY : WardSide.INTRUDER;
+                return SigillumTeams.sameSide(level.getServer(), owner, creatureOwner) ? WardSide.ALLY : WardSide.INTRUDER;
             }
             return entity instanceof Enemy ? WardSide.INTRUDER : WardSide.NEUTRAL;
         }

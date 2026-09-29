@@ -1214,10 +1214,7 @@ public final class SkillCast {
     public static boolean isAllyCreature(ServerPlayer caster, Entity entity) {
         if (!(entity instanceof LivingEntity living) || entity instanceof Player) return false;
         UUID owner = SigillumChannels.OWNER.first(living).orElse(null);
-        if (owner == null) return false;
-        if (owner.equals(caster.getUUID())) return true;
-        ServerPlayer keeper = caster.server.getPlayerList().getPlayer(owner);
-        return keeper != null && caster.isAlliedTo(keeper);
+        return owner != null && SigillumTeams.sameSide(caster.server, caster.getUUID(), owner);
     }
 
     /** Whether this skill leaves the entity alone because it is one of the caster's own creatures. */

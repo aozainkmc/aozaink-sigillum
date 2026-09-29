@@ -134,6 +134,16 @@ public final class SigillumShieldManager {
         return Math.max(0.0f, damage - blocked);
     }
 
+    /** Soaks attrition (not a hit) from an ally's shield without effects; returns how much it took. */
+    public static float absorbAllyQuietly(LivingEntity entity, float amount) {
+        ShieldState state = ALLY_SHIELDS.get(entity);
+        if (state == null || state.amount <= 0.0f || amount <= 0.0f) return 0.0f;
+        float taken = Math.min(state.amount, amount);
+        state.amount -= taken;
+        if (state.amount <= 0.0f) ALLY_SHIELDS.remove(entity);
+        return taken;
+    }
+
     public static void clearAlly(LivingEntity entity) {
         ALLY_SHIELDS.remove(entity);
     }
