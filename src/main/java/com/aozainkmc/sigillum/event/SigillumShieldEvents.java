@@ -23,6 +23,7 @@ public final class SigillumShieldEvents {
     @SubscribeEvent(priority = EventPriority.LOW)
     public static void onLivingDamage(LivingIncomingDamageEvent event) {
         if (event.getEntity().level().isClientSide()) return;
+        if (event.getAmount() > 0.0f) SigillumShieldManager.noteHurt(event.getEntity());
         if (!(event.getEntity() instanceof ServerPlayer player)) {
             event.setAmount(SigillumShieldManager.absorbAlly(event.getEntity(), event.getAmount()));
             return;

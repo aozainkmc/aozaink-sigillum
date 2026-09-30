@@ -424,6 +424,15 @@ public final class SigillumInscriptionManager {
                     CooldownKey key = new CooldownKey(entity.getUUID(), skill);
                     if (cooldowns.getOrDefault(key, 0) > 0) continue;
                     int cooldown = cooldown(skill, entity);
+                    if ("护".equals(skill) && side != WardSide.INTRUDER) {
+                        cooldowns.put(key, cooldown);
+                        int restored = regenerateShield(entity, side, power);
+                        if (restored > 0) {
+                            energy = Math.max(0, energy - restored);
+                            changed = true;
+                        }
+                        continue;
+                    }
                     if (apply(level, entity, skill, center)) {
                         energy = Math.max(0, energy - energyCost(skill, entity, center));
                         cooldowns.put(key, cooldown);
@@ -570,23 +579,29 @@ public final class SigillumInscriptionManager {
             return true;
         }
 
+        // Intruders only: shields for everyone else are regenerated in tick() through regenerateShield.
         private boolean ward(ServerLevel level, ServerPlayer ownerPlayer, LivingEntity entity, Vec3 center, float power) {
-            WardSide side = wardSide(level, entity);
-            if (side == WardSide.INTRUDER) {
-                entity.invulnerableTime = 0;
-                hurtWithOwner(level, ownerPlayer, entity, wardDamage(entity, center, power));
-                drawWardRipple(level, center, entity);
-                return true;
-            }
+            if (wardSide(level, entity) != WardSide.INTRUDER) return false;
+            entity.invulnerableTime = 0;
+            hurtWithOwner(level, ownerPlayer, entity, wardDamage(entity, center, power));
+            drawWardRipple(level, center, entity);
+            return true;
+        }
+
+        // One refresh of the ward's shield for a player (ally or neutral, as before) or an allied
+        // creature. The ward pays one energy per shield point actually restored, so full shields cost
+        // nothing and the ward runs on its own time unless it is really soaking damage.
+        private int regenerateShield(LivingEntity entity, WardSide side, float power) {
+            float wardShield = SkillCast.shieldAmount(power);
+            float restored;
             if (entity instanceof ServerPlayer player) {
-                SigillumShieldManager.grant(player, SkillCast.shieldAmount(power));
-                return true;
+                restored = SigillumShieldManager.regenerate(player, wardShield);
+            } else if (side == WardSide.ALLY) {
+                restored = SigillumShieldManager.regenerateAlly(entity, wardShield);
+            } else {
+                return 0;
             }
-            if (side == WardSide.ALLY) {
-                SigillumShieldManager.grantAlly(entity, SkillCast.shieldAmount(power));
-                return true;
-            }
-            return false;
+            return restored > 0.0f ? (int) Math.ceil(restored) : 0;
         }
 
         // Who 刻护 protects and who it repels. Allies: the owner, the owner's teammates, and

@@ -23,6 +23,12 @@ public final class SigillumShieldManager {
     // Shields on allied creatures other than players (another module's summons answering the
     // aozaink_sigillum:owner channel). No HUD; kept in memory only and dropped when they go.
     private static final Map<LivingEntity, ShieldState> ALLY_SHIELDS = new WeakHashMap<>();
+    // 刻护 no longer refills a shield at once: each refresh (one per second) restores this share of
+    // the ward's shield, and any damage stops the refreshes for a while, so stepping back into a ward
+    // mid-fight is a real retreat rather than an instant refill.
+    public static final float WARD_REGEN_FRACTION = 0.10f;
+    public static final long WARD_REGEN_LOCKOUT_TICKS = 100L;
+    private static final Map<UUID, Long> LAST_HURT = new HashMap<>();
 
     private SigillumShieldManager() {}
 
@@ -108,15 +114,6 @@ public final class SigillumShieldManager {
         return remaining;
     }
 
-    /** Shield on an allied non-player creature, capped the same way a player's shield is. */
-    public static void grantAlly(LivingEntity entity, float amount) {
-        if (amount <= 0.0f) return;
-        ShieldState current = ALLY_SHIELDS.get(entity);
-        float max = Math.max(amount, current == null ? amount : current.max);
-        float shield = current == null ? amount : Math.min(max, current.amount + amount);
-        ALLY_SHIELDS.put(entity, new ShieldState(shield, max));
-    }
-
     public static float absorbAlly(LivingEntity entity, float damage) {
         if (damage <= 0.0f) return damage;
         ShieldState state = ALLY_SHIELDS.get(entity);
@@ -144,11 +141,61 @@ public final class SigillumShieldManager {
         return taken;
     }
 
+    /** Remembers that the entity was just hurt, pausing ward regeneration for it. */
+    public static void noteHurt(LivingEntity entity) {
+        LAST_HURT.put(entity.getUUID(), entity.level().getGameTime());
+    }
+
+    private static boolean regenPaused(LivingEntity entity) {
+        return regenPaused(LAST_HURT.get(entity.getUUID()), entity.level().getGameTime());
+    }
+
+    static boolean regenPaused(Long hurtAt, long now) {
+        return hurtAt != null && now - hurtAt < WARD_REGEN_LOCKOUT_TICKS;
+    }
+
+    /** Points one ward refresh adds to a shield of the given size; 0 once it is full. */
+    static float regenStep(float current, float wardShield) {
+        if (wardShield <= 0.0f || current >= wardShield) return 0.0f;
+        return Math.min(wardShield * WARD_REGEN_FRACTION, wardShield - current);
+    }
+
+    /**
+     * One ward refresh for a player: restores WARD_REGEN_FRACTION of the ward's shield, never above
+     * it, nothing while paused after damage. Returns the points restored (what the ward pays for).
+     */
+    public static float regenerate(ServerPlayer player, float wardShield) {
+        if (regenPaused(player)) return 0.0f;
+        ShieldState current = SHIELDS.get(player.getUUID());
+        float before = current == null ? 0.0f : current.amount;
+        float restored = regenStep(before, wardShield);
+        if (restored <= 0.0f) return 0.0f;
+        ShieldState next = new ShieldState(before + restored, Math.max(wardShield, current == null ? wardShield : current.max));
+        SHIELDS.put(player.getUUID(), next);
+        sync(player, next);
+        return restored;
+    }
+
+    /** The same refresh for an allied creature. */
+    public static float regenerateAlly(LivingEntity entity, float wardShield) {
+        if (regenPaused(entity)) return 0.0f;
+        ShieldState current = ALLY_SHIELDS.get(entity);
+        float before = current == null ? 0.0f : current.amount;
+        float restored = regenStep(before, wardShield);
+        if (restored <= 0.0f) return 0.0f;
+        ALLY_SHIELDS.put(entity, new ShieldState(before + restored, Math.max(wardShield, current == null ? wardShield : current.max)));
+        return restored;
+    }
+
     public static void clearAlly(LivingEntity entity) {
         ALLY_SHIELDS.remove(entity);
     }
 
     public static void tick(MinecraftServer server) {
+        if (!LAST_HURT.isEmpty()) {
+            long now = server.overworld().getGameTime();
+            LAST_HURT.values().removeIf(hurtAt -> now - hurtAt >= WARD_REGEN_LOCKOUT_TICKS);
+        }
         if (!ALLY_SHIELDS.isEmpty()) {
             ALLY_SHIELDS.entrySet().removeIf(entry -> !entry.getKey().isAlive() || entry.getKey().isRemoved()
                 || entry.getValue().amount <= 0.0f);
